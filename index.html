@@ -509,19 +509,21 @@ function viewFinances(){
 const TE = new TextEncoder(), TD = new TextDecoder();
 const b64 = u8 => { let s = ""; u8 = new Uint8Array(u8); for(let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 const ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-let VKEY = null, VAULT = null, VURLS = [];
-const VKIND = { passeport:"Passeport", permis:"Permis", carte:"Carte", assurance:"Assurance", voyage:"Voyage (ESTA, visa)", autre:"Autre" };
-async function deriveKey(pass, salt){
-  const base = await crypto.subtle.importKey("raw", TE.encode(pass), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name:"PBKDF2", salt, iterations:310000, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+let VKEY = null, VRAW = null, VAULT = null, VURLS = [], FIDPEND = null;
+const VKIND = { passeport:"Passeport", identite:"Carte d’identité", permis:"Permis", voyage:"Voyage (ESTA, visa)", assurance:"Assurance", sante:"Santé, mutuelle", banque:"Carte bancaire", carte:"Carte de membre, fidélité", autre:"Autre" };
+async function deriveRaw(pass, salt){
+  const base = await crypto.subtle.importKey("raw", TE.encode(pass), "PBKDF2", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name:"PBKDF2", salt, iterations:310000, hash:"SHA-256" }, base, 256));
 }
+const importAes = raw => crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt","decrypt"]);
 async function encBytes(bytes){ const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, VKEY, bytes); return { iv:b64(iv), ct }; }
 const decBytes = (iv, ct, key = VKEY) => crypto.subtle.decrypt({ name:"AES-GCM", iv:ub64(iv) }, key, ct);
 async function loadVault(){
-  const [s, v] = await Promise.all([ sb.from("perso_settings").select("value").eq("key","vault").maybeSingle(), sb.from("perso_vault").select("*").order("label") ]);
-  VAULT = { conf: s.data?.value || null, docs: v.data || [] };
+  const [s, v] = await Promise.all([ sb.from("perso_settings").select("key,value").in("key",["vault","vault_faceid"]), sb.from("perso_vault").select("*").order("label") ]);
+  const st = Object.fromEntries((s.data || []).map(r => [r.key, r.value]));
+  VAULT = { conf: st.vault || null, fid: st.vault_faceid || null, docs: v.data || [] };
 }
-function lockVault(){ VKEY = null; VURLS.forEach(URL.revokeObjectURL); VURLS = []; if($("#dlg").open && FORM?.kind === "vault") $("#dlg").close(); }
+function lockVault(){ VKEY = null; VRAW = null; FIDPEND = null; VURLS.forEach(URL.revokeObjectURL); VURLS = []; if($("#dlg").open && FORM?.kind === "vault") $("#dlg").close(); }
 
 function viewCoffre(){
   if(!VAULT) { loadVault().then(render); return `<p class="empty">Chargement…</p>`; }
@@ -532,8 +534,9 @@ function viewCoffre(){
     <div class="f"><label for="v2">Confirmez le code</label><input id="v2" type="password" autocomplete="new-password"></div>
     <button class="btn" data-vcreate>Créer le coffre</button><p class="msg" id="vMsg" role="status"></p></section>`;
   if(!VKEY) return `<section><h3>Coffre verrouillé</h3>
+    ${VAULT.fid ? `<button class="btn" data-fidopen style="width:100%;font-size:1.05rem">Ouvrir avec Face ID</button><p class="muted" style="margin-top:18px">Ou avec le code :</p>` : ""}
     <div class="f"><label for="vp">Code du coffre</label><input id="vp" type="password" autocomplete="current-password"></div>
-    <button class="btn" data-vunlock>Ouvrir</button><p class="msg" id="vMsg" role="status"></p>
+    <button class="btn${VAULT.fid ? " line" : ""}" data-vunlock>Ouvrir avec le code</button><p class="msg" id="vMsg" role="status"></p>
     <p class="muted">Le coffre se referme dès que vous quittez l’app.</p></section>`;
   const t = todayISO();
   const row = d => {
@@ -542,7 +545,10 @@ function viewCoffre(){
     return `<button class="row" data-vdoc="${d.id}"><h3>${esc(d.label)}</h3><div class="meta">${esc(VKIND[d.kind] || "")}${d.files.length ? `, ${d.files.length} photo${d.files.length > 1 ? "s" : ""}` : ""}</div>
       ${chip ? `<div class="shows" style="justify-content:flex-start">${chip}</div>` : ""}</button>`;
   };
-  return `<div class="toolbar"><button class="btn small line" data-vlock>Verrouiller</button><button class="btn small" data-vnew>Ajouter un document</button></div>
+  const fidBtn = !window.PublicKeyCredential ? "" : FIDPEND ? `<button class="btn small" data-fidfinish>Confirmer avec Face ID</button>`
+    : VAULT.fid ? `<button class="btn ghost small" style="margin:0" data-fidoff>Désactiver Face ID</button>` : `<button class="btn small line" data-fidon>Activer Face ID</button>`;
+  return `<div class="toolbar"><button class="btn small line" data-vlock>Verrouiller</button>${fidBtn}<button class="btn small" data-vnew>Ajouter</button></div>
+    ${FIDPEND ? `<p class="muted">Encore une confirmation Face ID pour terminer l’activation.</p>` : ""}
     <div style="margin-top:14px">${VAULT.docs.map(row).join("") || `<p class="empty">Le coffre est vide. Ajoutez votre passeport, vos permis et vos cartes, avec une photo de chacun.</p>`}</div>`;
 }
 async function vaultCreate(){
@@ -550,7 +556,7 @@ async function vaultCreate(){
   if(a.length < 8) return m.textContent = "Le code doit faire au moins 8 caractères.";
   if(a !== b) return m.textContent = "Les deux codes ne sont pas identiques.";
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  VKEY = await deriveKey(a, salt);
+  VRAW = await deriveRaw(a, salt); VKEY = await importAes(VRAW);
   const chk = await encBytes(TE.encode("murph-coffre-ok"));
   const value = { salt:b64(salt), iv:chk.iv, check:b64(chk.ct), iterations:310000 };
   const { error } = await sb.from("perso_settings").insert({ key:"vault", value });
@@ -560,11 +566,64 @@ async function vaultCreate(){
 async function vaultUnlock(){
   const m = $("#vMsg"); m.textContent = "Vérification…";
   try{
-    const c = VAULT.conf, key = await deriveKey($("#vp").value, ub64(c.salt));
+    const c = VAULT.conf, raw = await deriveRaw($("#vp").value, ub64(c.salt)), key = await importAes(raw);
     const ok = TD.decode(await decBytes(c.iv, ub64(c.check), key));
     if(ok !== "murph-coffre-ok") throw 0;
-    VKEY = key; render();
+    VKEY = key; VRAW = raw; render();
   } catch(e){ m.textContent = "Code incorrect."; }
+}
+
+// ---------- Coffre : Face ID (passkey + extension PRF) ----------
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+async function prfGet(credId, salt){
+  const a = await navigator.credentials.get({ publicKey:{ challenge:rnd(32), allowCredentials:[{ type:"public-key", id:credId }],
+    userVerification:"required", timeout:60000, extensions:{ prf:{ eval:{ first:salt } } } } });
+  const r = a.getClientExtensionResults()?.prf?.results?.first;
+  if(!r) throw new Error("nosupport");
+  return new Uint8Array(r);
+}
+async function fidStore(credId, salt, secret){
+  const wk = await importAes(secret), iv = rnd(12);
+  const wrapped = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, wk, VRAW);
+  const value = { cred:b64(credId), salt:b64(salt), iv:b64(iv), wrapped:b64(wrapped) };
+  const { error } = await sb.from("perso_settings").upsert({ key:"vault_faceid", value });
+  if(error) throw error;
+  VAULT.fid = value; FIDPEND = null; render(); toast("Face ID activé");
+}
+const fidErr = e => toast(e?.message === "nosupport" ? "Face ID n’est pas disponible pour le coffre sur cet appareil (iOS 18 minimum)." : e?.name === "NotAllowedError" ? "Face ID annulé." : "Face ID : " + (e?.message || e));
+async function fidEnable(){
+  try{
+    const salt = rnd(32);
+    const cred = await navigator.credentials.create({ publicKey:{
+      rp:{ name:"Murph" }, user:{ id:rnd(16), name:"Murph – coffre", displayName:"Murph – coffre" }, challenge:rnd(32),
+      pubKeyCredParams:[{ type:"public-key", alg:-7 }, { type:"public-key", alg:-257 }],
+      authenticatorSelection:{ authenticatorAttachment:"platform", residentKey:"required", userVerification:"required" },
+      timeout:60000, extensions:{ prf:{ eval:{ first:salt } } } } });
+    const prf = cred.getClientExtensionResults()?.prf;
+    if(prf?.enabled === false) throw new Error("nosupport");
+    const credId = new Uint8Array(cred.rawId);
+    if(prf?.results?.first) return fidStore(credId, salt, new Uint8Array(prf.results.first));
+    FIDPEND = { credId, salt }; render();
+  } catch(e){ fidErr(e); }
+}
+async function fidFinish(){
+  try{ const r = await prfGet(FIDPEND.credId, FIDPEND.salt); await fidStore(FIDPEND.credId, FIDPEND.salt, r); }
+  catch(e){ fidErr(e); }
+}
+async function fidOpen(){
+  try{
+    const f = VAULT.fid, r = await prfGet(ub64(f.cred), ub64(f.salt));
+    const raw = new Uint8Array(await crypto.subtle.decrypt({ name:"AES-GCM", iv:ub64(f.iv) }, await importAes(r), ub64(f.wrapped)));
+    const key = await importAes(raw), c = VAULT.conf;
+    if(TD.decode(await decBytes(c.iv, ub64(c.check), key)) !== "murph-coffre-ok") throw new Error("clé incorrecte");
+    VKEY = key; VRAW = raw; render();
+  } catch(e){ fidErr(e); }
+}
+async function fidOff(){
+  if(!confirm("Désactiver Face ID pour le coffre ? Le code restera nécessaire pour l’ouvrir.")) return;
+  const { error } = await sb.from("perso_settings").delete().eq("key","vault_faceid");
+  if(error) return toast("Pas enregistré : " + error.message);
+  VAULT.fid = null; render(); toast("Face ID désactivé");
 }
 async function shrinkImage(file){
   if(!file.type.startsWith("image/")) return file;
@@ -851,6 +910,10 @@ $("#main").addEventListener("click", async ev => {
   if(g("[data-vunlock]")) return vaultUnlock();
   if(g("[data-vlock]")){ lockVault(); return render(); }
   if(g("[data-vnew]")) return openVaultDoc(null);
+  if(g("[data-fidopen]")) return fidOpen();
+  if(g("[data-fidon]")) return fidEnable();
+  if(g("[data-fidfinish]")) return fidFinish();
+  if(g("[data-fidoff]")) return fidOff();
   if(b = g("[data-vdoc]")) return openVaultDoc(VAULT.docs.find(d => d.id === b.dataset.vdoc));
   if(b = g("[data-new]")){
     const tr = b.dataset.trip || (route().id ?? null);
