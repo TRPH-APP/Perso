@@ -378,12 +378,26 @@ function bkLine(b){
   if(b.reference) bits.push("réf. " + b.reference);
   return bits.join(", ");
 }
+// Période par défaut d'un voyage : du 1er au dernier jour où je monte une classe ; sinon dates des shows
+function tripWindow(tripId){
+  const x = tripOf(tripId); if(!x) return null;
+  const ids = x.show_ids || [];
+  const days = D.entries.filter(e => ids.includes(e.show_id) && e.shown_by === D.meId)
+    .flatMap(e => (e.class_ids || []).map(c => D.cls[c]?.class_date)).filter(Boolean).sort();
+  if(days.length) return { from:days[0], to:days[days.length - 1], src:"classes" };
+  const sh = ids.map(i => D.show[i]).filter(Boolean);
+  if(sh.length) return { from: sh.map(s => s.start_date).sort()[0], to: sh.map(s => s.end_date || s.start_date).sort().pop(), src:"show" };
+  return x.start_date ? { from:x.start_date, to:x.end_date || x.start_date, src:"voyage" } : null;
+}
+const SRC = { classes:"d’après vos classes", show:"dates du show, programme pas encore importé", voyage:"dates du voyage" };
+const winText = w => w ? `du ${fmt(w.from,{weekday:"short",day:"numeric",month:"short"})} au ${fmt(w.to,{weekday:"short",day:"numeric",month:"short"})} (${SRC[w.src]})` : "";
 function bkCard(b){
   const todo = b.status === "afaire";
   return `<button class="bk${todo ? " todo" : ""}" data-edit-bk="${b.id}">
     <span class="k">${todo ? "À réserver" : esc(KIND[b.kind])}</span>
     <span><span class="t">${esc(b.title)}</span>${todo ? ` <span class="s">${esc(KIND[b.kind])}</span>` : ""}
-    ${bkLine(b) ? `<br><span class="s">${esc(bkLine(b))}</span>` : ""}</span></button>`;
+    ${bkLine(b) ? `<br><span class="s">${esc(bkLine(b))}</span>` : ""}
+    ${todo && !b.start_date && tripWindow(b.trip_id) ? `<br><span class="s">${esc(winText(tripWindow(b.trip_id)))}</span>` : ""}</span></button>`;
 }
 function taskRow(d, showTrip){
   const t = todayISO(), late = d.due_date && d.due_date < t && d.status !== "fait";
@@ -416,7 +430,7 @@ function homeExtras(t){
   const toBook = D.bookings.filter(b => b.status === "afaire" && upcomingTrips.has(b.trip_id)).sort(sortBk);
   if(tasks.length || toBook.length){
     html += `<section><h3>À faire</h3>${tasks.map(d => taskRow(d, true)).join("")}`;
-    if(toBook.length) html += `<p class="muted" style="margin-top:12px">À réserver : ${toBook.map(b => `${esc(b.title)} <span>(${esc(tripOf(b.trip_id)?.title || "")})</span>`).join(", ")}.</p>`;
+    if(toBook.length) html += `<p class="muted" style="margin:14px 0 6px">À réserver</p>${toBook.map(bkCard).join("")}`;
     html += `</section>`;
   }
   return html;
@@ -450,7 +464,8 @@ function viewVoyage(id){
   if(!x) return `<a class="back" href="#voyages">Tous les voyages</a><p class="empty">Ce voyage n’existe plus.</p>`;
   const shows = (x.show_ids || []).map(s => D.show[s]).filter(Boolean);
   const bk = D.bookings.filter(b => b.trip_id === id && b.status !== "annule").sort(sortBk);
-  const dated = bk.filter(b => b.start_date), undated = bk.filter(b => !b.start_date);
+  const toBook = bk.filter(b => b.status === "afaire" && !b.start_date);
+  const dated = bk.filter(b => b.start_date), undated = bk.filter(b => !b.start_date && !toBook.includes(b));
   const days = {}; dated.forEach(b => (days[b.start_date] ||= []).push(b));
   const tasks = D.deadlines.filter(d => d.trip_id === id)
     .sort((a,b) => (a.status === "fait") - (b.status === "fait") || (a.due_date||"9999").localeCompare(b.due_date||"9999"));
@@ -463,6 +478,7 @@ function viewVoyage(id){
     ${shows.length ? `<div class="shows" style="justify-content:flex-start">${shows.map(s => `<a class="chip on" style="text-decoration:none" href="#concours">${esc(s.name)}</a>`).join("")}</div>` : ""}
     ${x.notes ? `<p>${esc(x.notes)}</p>` : ""}
     <section><div class="toolbar" style="margin-top:0"><h3>Réservations</h3><button class="btn small" data-new="bk" data-trip="${id}">Ajouter</button></div>
+      ${toBook.length ? `<div class="tl-day"><h4>À réserver</h4>${toBook.map(bkCard).join("")}</div>` : ""}
       ${Object.entries(days).map(([d, list]) => `<div class="tl-day"><h4>${esc(fmt(d,{weekday:"long",day:"numeric",month:"long"}))}</h4>${list.map(bkCard).join("")}</div>`).join("")}
       ${undated.length ? `<div class="tl-day"><h4>Sans date</h4>${undated.map(bkCard).join("")}</div>` : ""}
       ${bk.length ? "" : `<p class="empty">Aucune réservation. Écrivez-moi « j’ai réservé un vol » après une réservation, ou ajoutez-la ici.</p>`}
@@ -785,6 +801,7 @@ function openForm(kind, row, preset = {}){
       ${sel("trip_id","Voyage",tripOpts(r.trip_id))}
       <div class="f2">${inp("start_date","Date de début",r.start_date,"date")}${inp("start_time","Heure",r.start_time,"time")}</div>
       <div class="f2">${inp("end_date","Date de fin",r.end_date,"date")}${inp("end_time","Heure",r.end_time,"time")}</div>
+      ${!r.start_date && r.trip_id && tripWindow(r.trip_id) ? `<p class="muted" style="margin:6px 0 0">Laissez vide pour suivre automatiquement la période : ${esc(winText(tripWindow(r.trip_id)))}.</p>` : ""}
       <div class="f2">${inp("origin","Départ (code aéroport)",r.origin)}${inp("destination","Arrivée",r.destination)}</div>
       <div class="f2">${inp("flight_no","N° de vol",r.flight_no)}${inp("seat","Siège",r.seat)}</div>
       <div class="f2">${inp("provider","Compagnie ou loueur",r.provider)}${inp("cabin","Classe, catégorie",r.cabin)}</div>
