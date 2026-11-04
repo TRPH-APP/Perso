@@ -84,7 +84,7 @@ section > h3{font-size:1.15rem;margin-bottom:10px}
 
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
   padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:4px;z-index:5}
-nav a{flex:0 1 150px;text-align:center;padding:8px 6px;border-radius:8px;color:var(--soft);text-decoration:none;font-weight:600;font-size:.95rem}
+nav a{flex:0 1 130px;text-align:center;padding:8px 6px;border-radius:8px;color:var(--soft);text-decoration:none;font-weight:600;font-size:.95rem}
 nav a[aria-current=page]{color:var(--turq);background:color-mix(in srgb,var(--turq) 12%,transparent)}
 
 .login{max-width:380px;margin:12vh auto 0;padding:0 22px}
@@ -95,6 +95,58 @@ nav a[aria-current=page]{color:var(--turq);background:color-mix(in srgb,var(--tu
 .btn.ghost{background:transparent;color:var(--soft);padding:12px 0;margin-left:14px}
 .msg{min-height:1.5em;margin-top:12px;color:var(--warn)}
 .empty{padding:24px 0;color:var(--soft)}
+
+/* Étape 2 */
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px}
+.btn.small{margin:0;padding:8px 14px;font-size:.92rem}
+.btn.line{background:transparent;color:var(--turq);border:1px solid var(--turq)}
+.btn.danger{background:transparent;color:var(--warn);border:1px solid var(--warn)}
+.row{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;margin-bottom:10px;cursor:pointer;color:var(--ink);text-decoration:none}
+.row h3{font-size:1.08rem;line-height:1.25}
+.row .meta{color:var(--soft);font-size:.9rem;margin-top:2px}
+.back{display:inline-block;margin-top:16px;color:var(--turq);font-weight:600;text-decoration:none}
+.tl-day{margin-top:18px}
+.tl-day > h4{margin:0 0 8px;font-size:.95rem;color:var(--soft);font-weight:600}
+.bk{display:grid;grid-template-columns:4.2rem 1fr;gap:10px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
+  border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;color:var(--ink)}
+.bk .k{font-size:.8rem;font-weight:700;color:var(--saddle);padding-top:2px}
+.bk .t{font-weight:600}
+.bk .s{color:var(--soft);font-size:.9rem}
+.bk.todo{border-style:dashed;border-color:var(--warn)}
+.bk.todo .k{color:var(--warn)}
+.task{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.task:last-child{border-bottom:1px solid var(--line)}
+.task input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--turq);flex:none}
+.task .tx{flex:1;cursor:pointer}
+.task .d{color:var(--soft);font-size:.88rem;white-space:nowrap}
+.task .d.late{color:var(--warn);font-weight:600}
+.task.done .tx{text-decoration:line-through;color:var(--soft)}
+.flight{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.flight .route{font-family:"Young Serif",Georgia,serif;font-size:1.6rem;line-height:1.1}
+.flight .s{color:var(--soft);font-size:.9rem}
+.balance{text-align:center;padding:22px 16px;background:var(--num-bg);color:var(--num-ink);border-radius:10px;margin:-48px auto 0;box-shadow:0 14px 30px -18px rgba(10,30,32,.55)}
+.balance .amt{font-family:"Young Serif",Georgia,serif;font-size:clamp(2.6rem,12vw,4rem);line-height:1.1;margin:4px 0}
+.balance p{margin:0}
+.ex{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--line);cursor:pointer}
+.ex:last-child{border-bottom:1px solid var(--line)}
+.ex .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ex .s{color:var(--soft);font-size:.88rem}
+.pos{color:var(--turq)} .neg{color:var(--warn)}
+details summary{cursor:pointer;color:var(--soft);font-weight:600;margin:14px 0 6px}
+dialog{border:0;border-radius:12px;padding:0;width:min(560px,94vw);max-height:90vh;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(8,22,24,.55)}
+dialog form{padding:18px 18px 16px;overflow:auto;max-height:90vh}
+dialog h2{font-size:1.3rem;margin-bottom:6px}
+.f{margin-top:12px}
+.f label{display:block;font-weight:600;font-size:.92rem;margin-bottom:4px}
+.f input,.f select,.f textarea{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+.f textarea{min-height:76px;resize:vertical}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;align-items:center}
+.actions .sp{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);
+  padding:10px 16px;border-radius:8px;z-index:20;font-size:.95rem}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:no-preference){ .bib{animation:drop .5s ease-out both} @keyframes drop{from{transform:translateY(-10px);opacity:0}} }
 </style>
@@ -120,7 +172,11 @@ nav a[aria-current=page]{color:var(--turq);background:color-mix(in srgb,var(--tu
   <nav>
     <a href="#accueil" data-v="accueil">Accueil</a>
     <a href="#concours" data-v="concours">Concours</a>
+    <a href="#voyages" data-v="voyages">Voyages</a>
+    <a href="#finances" data-v="finances">Finances</a>
   </nav>
+  <dialog id="dlg"><form id="frm" method="dialog"></form></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
 </div>
 
 <script>
@@ -171,12 +227,15 @@ $("#bLogin").onclick = async () => {
 async function load(){
   const { data:{ user } } = await sb.auth.getUser();
   const email = (user?.email || "").toLowerCase();
-  const [me, trips, shows] = await Promise.all([
+  const [me, trips, shows, bks, dls, exs] = await Promise.all([
     sb.from("people").select("id,name").eq("email", email).maybeSingle(),
     sb.from("perso_trips").select("*").order("start_date"),
-    sb.from("shows").select("id,name,location,start_date,end_date,entries_close").order("start_date")
+    sb.from("shows").select("id,name,location,start_date,end_date,entries_close").order("start_date"),
+    sb.from("perso_bookings").select("*"),
+    sb.from("perso_deadlines").select("*"),
+    sb.from("perso_expenses").select("*").order("spent_on", {ascending:false})
   ]);
-  if(trips.error) throw new Error("perso: " + trips.error.message);
+  for(const r of [trips, bks, dls, exs]) if(r.error) throw new Error("perso: " + r.error.message);
   if(shows.error) throw new Error("shows: " + shows.error.message);
   const meId = me.data?.id;
   let entries = [], horses = [], classes = [];
@@ -193,6 +252,8 @@ async function load(){
     horses = h.data || []; classes = c.data || [];
   }
   D = { meId, trips: trips.data, shows: shows.data, entries,
+        bookings: bks.data, deadlines: dls.data, expenses: exs.data,
+        trip: Object.fromEntries(trips.data.map(t => [t.id, t])),
         horse: Object.fromEntries(horses.map(h => [h.id, h])),
         cls: Object.fromEntries(classes.map(c => [c.id, c])),
         show: Object.fromEntries(shows.data.map(s => [s.id, s])) };
@@ -221,7 +282,7 @@ function viewAccueil(){
   const t = todayISO();
   const upcoming = D.trips.filter(x => (x.end_date || x.start_date) >= t);
   const cur = upcoming[0];
-  if(!cur) return `<div class="bib"><p class="when">Aucun voyage prévu</p><h2>Ajoutez votre prochain show</h2></div>`;
+  if(!cur) return `<div class="bib"><p class="when">Aucun voyage prévu</p><h2>Ajoutez votre prochain show</h2></div>` + homeExtras(t);
   const live = cur.start_date <= t;
   const n = live ? daysBetween(cur.start_date, t) + 1 : daysBetween(t, cur.start_date);
   const total = daysBetween(cur.start_date, cur.end_date) + 1;
@@ -241,6 +302,7 @@ function viewAccueil(){
     ${closing.length ? `<div class="shows">${closing.map(s => `<span class="chip warn">Inscriptions avant le ${esc(fmt(s.entries_close,{day:"numeric",month:"long"}))}</span>`).join("")}</div>` : ""}
   </div>`;
 
+  html += homeExtras(t);
   html += `<section><h3>Mes chevaux sur ce voyage</h3>`;
   html += showEntries.length
     ? shows.map(s => {
@@ -289,18 +351,290 @@ function viewConcours(){
     }).join("");
 }
 
+// ---------- Étape 2 : utilitaires ----------
+const KIND = { vol:"Vol", hotel:"Logement", voiture:"Voiture", autre:"Autre" };
+const CUR = { USD:"$", EUR:"€" };
+const money = (n, c="USD") => (Math.round(Number(n)*100)/100).toLocaleString("fr-BE",{minimumFractionDigits:2, maximumFractionDigits:2}) + "\u202f" + (CUR[c] || c);
+const tripOf = id => D.trip[id];
+const sortBk = (a,b) => (a.start_date||"9999").localeCompare(b.start_date||"9999") || (a.status === "afaire") - (b.status === "afaire") || (a.start_time||"").localeCompare(b.start_time||"");
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2600); }
+async function refresh(msg){ await load(); render(); if(msg) toast(msg); }
+
+function bkLine(b){
+  const bits = [];
+  if(b.kind === "vol"){
+    if(b.start_time) bits.push(`${b.start_time}${b.end_time ? " → " + b.end_time : ""}${b.end_date && b.end_date !== b.start_date && b.end_time ? " (+1)" : ""}`);
+    if(b.flight_no) bits.push(b.flight_no);
+    if(b.seat) bits.push("siège " + b.seat);
+    if(b.cabin) bits.push(b.cabin);
+  } else {
+    if(b.end_date && b.end_date !== b.start_date) bits.push("jusqu’au " + fmt(b.end_date,{day:"numeric",month:"short"}) + (b.end_time ? " " + b.end_time : ""));
+    if(b.start_time && b.kind === "hotel") bits.push("arrivée " + b.start_time);
+    if(b.cabin) bits.push(b.cabin);
+  }
+  if(b.reference) bits.push("réf. " + b.reference);
+  return bits.join(", ");
+}
+function bkCard(b){
+  const todo = b.status === "afaire";
+  return `<button class="bk${todo ? " todo" : ""}" data-edit-bk="${b.id}">
+    <span class="k">${todo ? "À réserver" : esc(KIND[b.kind])}</span>
+    <span><span class="t">${esc(b.title)}</span>${todo ? ` <span class="s">${esc(KIND[b.kind])}</span>` : ""}
+    ${bkLine(b) ? `<br><span class="s">${esc(bkLine(b))}</span>` : ""}</span></button>`;
+}
+function taskRow(d, showTrip){
+  const t = todayISO(), late = d.due_date && d.due_date < t && d.status !== "fait";
+  const tr = showTrip && d.trip_id ? tripOf(d.trip_id)?.title : "";
+  return `<div class="task${d.status === "fait" ? " done" : ""}">
+    <input type="checkbox" aria-label="Fait" data-done="${d.id}" ${d.status === "fait" ? "checked" : ""}>
+    <span class="tx" data-edit-dl="${d.id}">${esc(d.title)}${d.status === "encours" ? ` <span class="chip on">En cours</span>` : ""}
+      ${tr ? `<br><span class="muted">${esc(tr)}</span>` : ""}</span>
+    ${d.due_date ? `<span class="d${late ? " late" : ""}">${esc(fmt(d.due_date,{day:"numeric",month:"short"}))}</span>` : ""}
+  </div>`;
+}
+const openTasks = list => list.filter(d => d.status !== "fait")
+  .sort((a,b) => (a.due_date||"9999").localeCompare(b.due_date||"9999"));
+
+// ---------- Accueil : prochain vol et à faire ----------
+function homeExtras(t){
+  let html = "";
+  const fl = D.bookings.filter(b => b.kind === "vol" && b.status === "ok" && b.start_date >= t).sort(sortBk)[0];
+  if(fl){
+    const n = daysBetween(t, fl.start_date);
+    html += `<section><h3>Prochain vol</h3><button class="flight" style="width:100%;text-align:left;cursor:pointer;color:var(--ink)" data-edit-bk="${fl.id}">
+      <span><span class="route">${esc(fl.origin || "")} → ${esc(fl.destination || "")}</span><br>
+      <span class="s">${esc(fmtDay(fl.start_date))}${fl.start_time ? " à " + esc(fl.start_time) : ""}, ${esc(fl.flight_no || "")}${fl.seat ? ", siège " + esc(fl.seat) : ""}</span></span>
+      <span class="s">${n === 0 ? "aujourd’hui" : n === 1 ? "demain" : "dans " + n + " j"}</span></button></section>`;
+  }
+  const tasks = openTasks(D.deadlines).slice(0, 5);
+  const upcomingTrips = new Set(D.trips.filter(x => (x.end_date || x.start_date || "9999") >= t).map(x => x.id));
+  const toBook = D.bookings.filter(b => b.status === "afaire" && upcomingTrips.has(b.trip_id)).sort(sortBk);
+  if(tasks.length || toBook.length){
+    html += `<section><h3>À faire</h3>${tasks.map(d => taskRow(d, true)).join("")}`;
+    if(toBook.length) html += `<p class="muted" style="margin-top:12px">À réserver : ${toBook.map(b => `${esc(b.title)} <span>(${esc(tripOf(b.trip_id)?.title || "")})</span>`).join(", ")}.</p>`;
+    html += `</section>`;
+  }
+  return html;
+}
+
+// ---------- Voyages ----------
+function viewVoyages(){
+  const t = todayISO();
+  const up = D.trips.filter(x => (x.end_date || x.start_date || "9999") >= t);
+  const past = D.trips.filter(x => !up.includes(x)).reverse();
+  const row = x => {
+    const bk = D.bookings.filter(b => b.trip_id === x.id);
+    const todo = bk.filter(b => b.status === "afaire").length;
+    const tasks = D.deadlines.filter(d => d.trip_id === x.id && d.status !== "fait").length;
+    return `<a class="row" href="#voyage-${x.id}"><h3>${esc(x.title)}</h3>
+      <div class="meta">${esc(fmtRange(x.start_date, x.end_date))}${x.location ? "<br>" + esc(x.location) : ""}</div>
+      <div class="shows" style="justify-content:flex-start">
+        <span class="chip">${bk.filter(b => b.kind === "vol" && b.status === "ok").length} vols</span>
+        ${todo ? `<span class="chip warn">${todo} à réserver</span>` : ""}
+        ${tasks ? `<span class="chip on">${tasks} à faire</span>` : ""}
+      </div></a>`;
+  };
+  return `<div class="toolbar"><p class="muted" style="margin:0">Vos voyages, du plus proche au plus lointain.</p>
+    <button class="btn small" data-new="trip">Nouveau voyage</button></div>
+    <div style="margin-top:14px">${up.map(row).join("") || `<p class="empty">Aucun voyage à venir. Touchez « Nouveau voyage » pour en créer un.</p>`}</div>
+    ${past.length ? `<details><summary>Voyages passés (${past.length})</summary>${past.map(row).join("")}</details>` : ""}`;
+}
+
+function viewVoyage(id){
+  const x = tripOf(id);
+  if(!x) return `<a class="back" href="#voyages">Tous les voyages</a><p class="empty">Ce voyage n’existe plus.</p>`;
+  const shows = (x.show_ids || []).map(s => D.show[s]).filter(Boolean);
+  const bk = D.bookings.filter(b => b.trip_id === id && b.status !== "annule").sort(sortBk);
+  const dated = bk.filter(b => b.start_date), undated = bk.filter(b => !b.start_date);
+  const days = {}; dated.forEach(b => (days[b.start_date] ||= []).push(b));
+  const tasks = D.deadlines.filter(d => d.trip_id === id)
+    .sort((a,b) => (a.status === "fait") - (b.status === "fait") || (a.due_date||"9999").localeCompare(b.due_date||"9999"));
+  const ex = D.expenses.filter(e => e.trip_id === id);
+  return `<a class="back" href="#voyages">Tous les voyages</a>
+    <div class="toolbar" style="align-items:flex-start"><div>
+      <h2 style="font-size:1.6rem">${esc(x.title)}</h2>
+      <p class="muted" style="margin:4px 0 0">${esc(fmtRange(x.start_date, x.end_date))}${x.location ? "<br>" + esc(x.location) : ""}</p>
+    </div><button class="btn small line" data-edit-trip="${id}">Modifier</button></div>
+    ${shows.length ? `<div class="shows" style="justify-content:flex-start">${shows.map(s => `<a class="chip on" style="text-decoration:none" href="#concours">${esc(s.name)}</a>`).join("")}</div>` : ""}
+    ${x.notes ? `<p>${esc(x.notes)}</p>` : ""}
+    <section><div class="toolbar" style="margin-top:0"><h3>Réservations</h3><button class="btn small" data-new="bk" data-trip="${id}">Ajouter</button></div>
+      ${Object.entries(days).map(([d, list]) => `<div class="tl-day"><h4>${esc(fmt(d,{weekday:"long",day:"numeric",month:"long"}))}</h4>${list.map(bkCard).join("")}</div>`).join("")}
+      ${undated.length ? `<div class="tl-day"><h4>Sans date</h4>${undated.map(bkCard).join("")}</div>` : ""}
+      ${bk.length ? "" : `<p class="empty">Aucune réservation. Écrivez-moi « j’ai réservé un vol » après une réservation, ou ajoutez-la ici.</p>`}
+    </section>
+    <section><div class="toolbar" style="margin-top:0"><h3>Échéances</h3><button class="btn small" data-new="dl" data-trip="${id}">Ajouter</button></div>
+      ${tasks.map(d => taskRow(d, false)).join("") || `<p class="empty">Rien à prévoir pour ce voyage.</p>`}</section>
+    ${ex.length ? `<section><h3>Dépenses partagées</h3>${ex.map(exRow).join("")}<a class="back" href="#finances">Voir le solde avec Maria</a></section>` : ""}`;
+}
+
+// ---------- Finances ----------
+function owed(e){ // >0 : Maria me doit ; <0 : je dois à Maria
+  const ms = e.maria_share ?? (1 - Number(e.my_share));
+  return e.paid_by === "moi" ? Number(e.amount) * Number(ms) : -Number(e.amount) * Number(e.my_share);
+}
+function splitLabel(e){
+  const m = Number(e.my_share), r = Number(e.maria_share ?? (1 - m));
+  if(Math.abs(m - .5) < .001 && Math.abs(r - .5) < .001) return "moitié-moitié";
+  if(Math.abs(m - 1/3) < .001 && Math.abs(r - 1/3) < .001) return "en trois avec les clients";
+  return `vous ${Math.round(m*100)} %, Maria ${Math.round(r*100)} %`;
+}
+function exRow(e){
+  const o = owed(e);
+  return `<div class="ex" data-edit-ex="${e.id}"><span>${esc(e.label)}<br>
+    <span class="s">${e.paid_by === "moi" ? "Payé par vous" : "Payé par Maria"}, ${esc(money(e.amount, e.currency))}, ${esc(splitLabel(e))}${e.settled ? ", réglé" : ""}</span></span>
+    <span class="r ${o >= 0 ? "pos" : "neg"}">${o >= 0 ? "+" : "−"}${esc(money(Math.abs(o), e.currency))}</span></div>`;
+}
+function viewFinances(){
+  const open = D.expenses.filter(e => !e.settled), done = D.expenses.filter(e => e.settled);
+  const tot = {}; open.forEach(e => tot[e.currency] = (tot[e.currency] || 0) + owed(e));
+  const cur = Object.entries(tot).filter(([,v]) => Math.abs(v) >= .005);
+  const head = cur.length ? cur.map(([c, v]) => `<div style="margin-bottom:6px"><p class="muted">${v > 0 ? "Maria vous doit" : "Vous devez à Maria"}</p>
+      <div class="amt">${esc(money(Math.abs(v), c))}</div>
+      <button class="btn small line" data-settle="${c}">Marquer comme réglé</button></div>`).join("")
+    : `<p class="muted">Vous êtes quittes</p><div class="amt">0,00 $</div>`;
+  return `<div class="balance">${head}</div>
+    <div class="toolbar"><p class="muted" style="margin:0">Hôtels, voitures, courses : les vols restent en dehors.</p>
+      <button class="btn small" data-new="ex">Ajouter une dépense</button></div>
+    <section style="margin-top:14px">${open.map(exRow).join("") || `<p class="empty">Aucune dépense en cours.</p>`}</section>
+    ${done.length ? `<details><summary>Déjà réglé (${done.length})</summary>${done.map(exRow).join("")}</details>` : ""}`;
+}
+
+// ---------- Formulaires ----------
+const tripOpts = sel => `<option value="">Aucun</option>` + D.trips.map(x => `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(x.title)}</option>`).join("");
+const opt = (pairs, sel) => pairs.map(([v, l]) => `<option value="${v}"${v === (sel ?? "") ? " selected" : ""}>${esc(l)}</option>`).join("");
+const inp = (name, label, val, type="text", extra="") => `<div class="f"><label for="f_${name}">${label}</label><input id="f_${name}" name="${name}" type="${type}" value="${esc(val ?? "")}" ${extra}></div>`;
+const area = (name, label, val) => `<div class="f"><label for="f_${name}">${label}</label><textarea id="f_${name}" name="${name}">${esc(val ?? "")}</textarea></div>`;
+const sel = (name, label, inner) => `<div class="f"><label for="f_${name}">${label}</label><select id="f_${name}" name="${name}">${inner}</select></div>`;
+
+let FORM = null;
+function openForm(kind, row, preset = {}){
+  const r = row || preset, isNew = !row;
+  let body = "";
+  if(kind === "trip"){
+    body = `<h2>${isNew ? "Nouveau voyage" : "Modifier le voyage"}</h2>
+      ${inp("title","Nom du voyage",r.title,"text","required")}
+      ${inp("location","Lieu",r.location)}
+      <div class="f2">${inp("start_date","Départ",r.start_date,"date")}${inp("end_date","Retour",r.end_date,"date")}</div>
+      <div class="f"><label>Shows de ce voyage</label>${D.shows.filter(s => s.end_date >= todayISO() || (r.show_ids||[]).includes(s.id)).map(s =>
+        `<label style="font-weight:400;display:flex;gap:8px;margin:6px 0"><input type="checkbox" name="show_ids" value="${s.id}" ${(r.show_ids||[]).includes(s.id) ? "checked" : ""} style="width:auto">${esc(s.name)} <span class="muted">${esc(fmtRange(s.start_date, s.end_date))}</span></label>`).join("")}</div>
+      ${area("notes","Notes",r.notes)}`;
+  } else if(kind === "bk"){
+    body = `<h2>${isNew ? "Nouvelle réservation" : "Réservation"}</h2>
+      <div class="f2">${sel("kind","Type",opt([["vol","Vol"],["hotel","Logement"],["voiture","Voiture"],["autre","Autre"]], r.kind || "vol"))}
+        ${sel("status","Statut",opt([["ok","Réservé"],["afaire","À réserver"],["annule","Annulé"]], r.status || "ok"))}</div>
+      ${inp("title","Intitulé (ex. Bruxelles → Chicago)",r.title,"text","required")}
+      ${sel("trip_id","Voyage",tripOpts(r.trip_id))}
+      <div class="f2">${inp("start_date","Date de début",r.start_date,"date")}${inp("start_time","Heure",r.start_time,"time")}</div>
+      <div class="f2">${inp("end_date","Date de fin",r.end_date,"date")}${inp("end_time","Heure",r.end_time,"time")}</div>
+      <div class="f2">${inp("origin","Départ (code aéroport)",r.origin)}${inp("destination","Arrivée",r.destination)}</div>
+      <div class="f2">${inp("flight_no","N° de vol",r.flight_no)}${inp("seat","Siège",r.seat)}</div>
+      <div class="f2">${inp("provider","Compagnie ou loueur",r.provider)}${inp("cabin","Classe, catégorie",r.cabin)}</div>
+      <div class="f2">${inp("reference","Référence",r.reference)}${inp("ticket","N° de billet",r.ticket)}</div>
+      <div class="f2">${inp("cost","Montant",r.cost,"number",'step="0.01" inputmode="decimal"')}${sel("currency","Devise",opt([["USD","$ US"],["EUR","€"]], r.currency || "USD"))}</div>
+      ${area("notes","Notes",r.notes)}`;
+  } else if(kind === "dl"){
+    body = `<h2>${isNew ? "Nouvelle échéance" : "Échéance"}</h2>
+      ${inp("title","Quoi",r.title,"text","required")}
+      <div class="f2">${inp("due_date","Pour le",r.due_date,"date")}${sel("status","Statut",opt([["afaire","À faire"],["encours","En cours"],["fait","Fait"]], r.status || "afaire"))}</div>
+      ${sel("trip_id","Voyage",tripOpts(r.trip_id))}
+      ${area("notes","Notes",r.notes)}`;
+  } else if(kind === "ex"){
+    const m = Number(r.my_share ?? .5), q = Number(r.maria_share ?? (1 - m));
+    const split = isNew ? "half" : Math.abs(m-.5)<.001 && Math.abs(q-.5)<.001 ? "half" : Math.abs(m-1/3)<.001 && Math.abs(q-1/3)<.001 ? "third" : m === 0 && q === 1 ? "maria" : m === 1 && q === 0 ? "moi" : "custom";
+    body = `<h2>${isNew ? "Nouvelle dépense" : "Dépense"}</h2>
+      ${inp("label","Quoi",r.label,"text","required")}
+      <div class="f2">${inp("amount","Montant",r.amount,"number",'step="0.01" inputmode="decimal" required')}${sel("currency","Devise",opt([["USD","$ US"],["EUR","€"]], r.currency || "USD"))}</div>
+      <div class="f2">${sel("paid_by","Payé par",opt([["moi","Moi"],["maria","Maria"]], r.paid_by || "moi"))}${inp("spent_on","Date",r.spent_on || todayISO(),"date")}</div>
+      ${sel("split","Répartition",opt([["half","Moitié-moitié"],["third","En trois : vous, Maria, clients"],["maria","Tout pour Maria"],["moi","Tout pour moi"],["custom","Autre"]], split))}
+      <div class="f" id="customBox" ${split === "custom" ? "" : "hidden"}><label for="f_my_pct">Votre part en %</label><input id="f_my_pct" name="my_pct" type="number" min="0" max="100" value="${Math.round(m*100)}"></div>
+      ${sel("trip_id","Voyage",tripOpts(r.trip_id))}
+      ${isNew ? "" : `<div class="f"><label style="font-weight:400;display:flex;gap:8px"><input type="checkbox" name="settled" style="width:auto" ${r.settled ? "checked" : ""}>Réglé</label></div>`}
+      ${area("notes","Notes",r.notes)}`;
+  }
+  FORM = { kind, id: row?.id };
+  $("#frm").innerHTML = body + `<p class="msg" id="frmMsg" role="status"></p><div class="actions">
+    ${isNew ? "" : `<button type="button" class="btn danger small" data-del>Supprimer</button>`}<span class="sp"></span>
+    <button type="button" class="btn ghost small" data-close>Annuler</button>
+    <button type="submit" class="btn small">${isNew ? "Ajouter" : "Enregistrer"}</button></div>`;
+  const sp = $("#f_split"); if(sp) sp.onchange = () => $("#customBox").hidden = sp.value !== "custom";
+  $("#dlg").showModal();
+}
+const TABLE = { trip:"perso_trips", bk:"perso_bookings", dl:"perso_deadlines", ex:"perso_expenses" };
+function collect(kind){
+  const fd = new FormData($("#frm")), v = k => { const x = fd.get(k); return x === null || x === "" ? null : String(x).trim(); };
+  if(kind === "trip") return { title:v("title"), location:v("location"), start_date:v("start_date"), end_date:v("end_date"), notes:v("notes"), show_ids: fd.getAll("show_ids") };
+  if(kind === "bk") return Object.fromEntries(["kind","status","title","trip_id","start_date","start_time","end_date","end_time","origin","destination","flight_no","seat","provider","cabin","reference","ticket","currency","notes"].map(k => [k, v(k)]).concat([["cost", v("cost") === null ? null : Number(v("cost"))]]));
+  if(kind === "dl") return { title:v("title"), due_date:v("due_date"), status:v("status"), trip_id:v("trip_id"), notes:v("notes") };
+  if(kind === "ex"){
+    const sp = v("split"); let my = .5, ma = .5;
+    if(sp === "third"){ my = 1/3; ma = 1/3; } else if(sp === "maria"){ my = 0; ma = 1; } else if(sp === "moi"){ my = 1; ma = 0; }
+    else if(sp === "custom"){ my = Math.min(100, Math.max(0, Number(v("my_pct") || 0))) / 100; ma = 1 - my; }
+    const o = { label:v("label"), amount:Number(v("amount")), currency:v("currency"), paid_by:v("paid_by"), spent_on:v("spent_on") || todayISO(),
+      my_share:Number(my.toFixed(8)), maria_share:Number(ma.toFixed(8)), trip_id:v("trip_id"), notes:v("notes") };
+    if(FORM.id) o.settled = fd.get("settled") === "on";
+    return o;
+  }
+}
+$("#frm").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const data = collect(FORM.kind), t = TABLE[FORM.kind];
+  const q = FORM.id ? sb.from(t).update(data).eq("id", FORM.id) : sb.from(t).insert(data);
+  const { error } = await q;
+  if(error){ $("#frmMsg").textContent = "Pas enregistré : " + error.message; return; }
+  $("#dlg").close(); refresh(FORM.id ? "Modifié" : "Ajouté");
+});
+$("#frm").addEventListener("click", async ev => {
+  if(ev.target.closest("[data-close]")) $("#dlg").close();
+  if(ev.target.closest("[data-del]")){
+    if(!confirm("Supprimer définitivement ?")) return;
+    const { error } = await sb.from(TABLE[FORM.kind]).delete().eq("id", FORM.id);
+    if(error){ $("#frmMsg").textContent = "Pas supprimé : " + error.message; return; }
+    $("#dlg").close();
+    if(FORM.kind === "trip") location.hash = "#voyages";
+    refresh("Supprimé");
+  }
+});
+
 // ---------- Rendu ----------
-function route(){ return (location.hash.slice(1) || "accueil") === "concours" ? "concours" : "accueil"; }
+function route(){
+  const h = location.hash.slice(1) || "accueil";
+  if(h.startsWith("voyage-")) return { v:"voyages", id:h.slice(7) };
+  return { v: ["accueil","concours","voyages","finances"].includes(h) ? h : "accueil" };
+}
+const TITLES = { accueil:"Accueil", concours:"Concours", voyages:"Voyages", finances:"Finances" };
 function render(){
   if(!D) return;
-  const v = route();
-  $("#title").textContent = v === "concours" ? "Concours" : "Accueil";
+  const { v, id } = route();
+  $("#title").textContent = TITLES[v];
   document.querySelectorAll("nav a").forEach(a => a.dataset.v === v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
-  $("#main").innerHTML = v === "concours" ? viewConcours() : viewAccueil();
+  $("#main").innerHTML = v === "concours" ? viewConcours() : v === "voyages" ? (id ? viewVoyage(id) : viewVoyages()) : v === "finances" ? viewFinances() : viewAccueil();
 }
-$("#main").addEventListener("click", ev => {
-  const b = ev.target.closest("button[data-show]"); if(!b) return;
-  const id = b.dataset.show; openShows.has(id) ? openShows.delete(id) : openShows.add(id); render();
+$("#main").addEventListener("click", async ev => {
+  const g = s => ev.target.closest(s);
+  let b;
+  if(b = g("button[data-show]")){ const id = b.dataset.show; openShows.has(id) ? openShows.delete(id) : openShows.add(id); render(); return; }
+  if(b = g("[data-edit-bk]")) return openForm("bk", D.bookings.find(x => x.id === b.dataset.editBk));
+  if(b = g("[data-edit-dl]")) return openForm("dl", D.deadlines.find(x => x.id === b.dataset.editDl));
+  if(b = g("[data-edit-ex]")) return openForm("ex", D.expenses.find(x => x.id === b.dataset.editEx));
+  if(b = g("[data-edit-trip]")) return openForm("trip", tripOf(b.dataset.editTrip));
+  if(b = g("[data-new]")){
+    const tr = b.dataset.trip || (route().id ?? null);
+    return openForm(b.dataset.new, null, b.dataset.new === "trip" ? {} : { trip_id: tr });
+  }
+  if(b = g("[data-settle]")){
+    const c = b.dataset.settle;
+    if(!confirm("Marquer toutes les dépenses en " + (CUR[c] || c) + " comme réglées ?")) return;
+    const ids = D.expenses.filter(e => !e.settled && e.currency === c).map(e => e.id);
+    const { error } = await sb.from("perso_expenses").update({ settled:true }).in("id", ids);
+    if(error) return toast("Pas enregistré : " + error.message);
+    refresh("Réglé");
+  }
+});
+$("#main").addEventListener("change", async ev => {
+  const c = ev.target.closest("input[data-done]"); if(!c) return;
+  const { error } = await sb.from("perso_deadlines").update({ status: c.checked ? "fait" : "afaire" }).eq("id", c.dataset.done);
+  if(error){ c.checked = !c.checked; return toast("Pas enregistré : " + error.message); }
+  refresh(c.checked ? "Fait" : "Remis à faire");
 });
 addEventListener("hashchange", () => { render(); scrollTo({top:0}); });
 
