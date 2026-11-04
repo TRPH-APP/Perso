@@ -375,7 +375,7 @@ function bkLine(b){
     if(b.start_time && b.kind === "hotel") bits.push("arrivée " + b.start_time);
     if(b.cabin) bits.push(b.cabin);
   }
-  if(b.reference) bits.push("réf. " + b.reference);
+  if(b.reference) bits.push("n° " + b.reference);
   return bits.join(", ");
 }
 // Période par défaut d'un voyage : du 1er au dernier jour où je monte une classe ; sinon dates des shows
@@ -817,7 +817,7 @@ function openForm(kind, row, preset = {}){
       <div class="f2">${inp("origin","Départ (code aéroport)",r.origin)}${inp("destination","Arrivée",r.destination)}</div>
       <div class="f2">${inp("flight_no","N° de vol",r.flight_no)}${inp("seat","Siège",r.seat)}</div>
       <div class="f2">${inp("provider","Compagnie ou loueur",r.provider)}${inp("cabin","Classe, catégorie",r.cabin)}</div>
-      <div class="f2">${inp("reference","Référence",r.reference)}${inp("ticket","N° de billet",r.ticket)}</div>
+      <div class="f2">${inp("reference","N° de réservation",r.reference)}${inp("ticket","N° de billet",r.ticket)}</div>
       <div class="f2">${inp("cost","Montant",r.cost,"number",'step="0.01" inputmode="decimal"')}${sel("currency","Devise",opt([["USD","$ US"],["EUR","€"]], r.currency || "USD"))}</div>
       ${area("notes","Notes",r.notes)}`;
   } else if(kind === "pk"){
