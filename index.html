@@ -84,7 +84,7 @@ section > h3{font-size:1.15rem;margin-bottom:10px}
 
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
   padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:4px;z-index:5}
-nav a{flex:0 1 130px;text-align:center;padding:8px 6px;border-radius:8px;color:var(--soft);text-decoration:none;font-weight:600;font-size:.95rem}
+nav a{flex:0 1 120px;text-align:center;padding:8px 4px;border-radius:8px;color:var(--soft);text-decoration:none;font-weight:600;font-size:.9rem}
 nav a[aria-current=page]{color:var(--turq);background:color-mix(in srgb,var(--turq) 12%,transparent)}
 
 .login{max-width:380px;margin:12vh auto 0;padding:0 22px}
@@ -174,6 +174,7 @@ dialog h2{font-size:1.3rem;margin-bottom:6px}
     <a href="#concours" data-v="concours">Concours</a>
     <a href="#voyages" data-v="voyages">Voyages</a>
     <a href="#finances" data-v="finances">Finances</a>
+    <a href="#coffre" data-v="coffre">Coffre</a>
   </nav>
   <dialog id="dlg"><form id="frm" method="dialog"></form></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
@@ -227,15 +228,17 @@ $("#bLogin").onclick = async () => {
 async function load(){
   const { data:{ user } } = await sb.auth.getUser();
   const email = (user?.email || "").toLowerCase();
-  const [me, trips, shows, bks, dls, exs] = await Promise.all([
+  const [me, trips, shows, bks, dls, exs, pk] = await Promise.all([
     sb.from("people").select("id,name").eq("email", email).maybeSingle(),
     sb.from("perso_trips").select("*").order("start_date"),
     sb.from("shows").select("id,name,location,start_date,end_date,entries_close").order("start_date"),
     sb.from("perso_bookings").select("*"),
     sb.from("perso_deadlines").select("*"),
-    sb.from("perso_expenses").select("*").order("spent_on", {ascending:false})
+    sb.from("perso_expenses").select("*").order("spent_on", {ascending:false}),
+    sb.from("perso_packing").select("*"),
+    loadVault()
   ]);
-  for(const r of [trips, bks, dls, exs]) if(r.error) throw new Error("perso: " + r.error.message);
+    for(const r of [trips, bks, dls, exs]) if(r.error) throw new Error("perso: " + r.error.message);
   if(shows.error) throw new Error("shows: " + shows.error.message);
   const meId = me.data?.id;
   let entries = [], horses = [], classes = [];
@@ -252,7 +255,7 @@ async function load(){
     horses = h.data || []; classes = c.data || [];
   }
   D = { meId, trips: trips.data, shows: shows.data, entries,
-        bookings: bks.data, deadlines: dls.data, expenses: exs.data,
+        bookings: bks.data, deadlines: dls.data, expenses: exs.data, packing: pk.data || [],
         trip: Object.fromEntries(trips.data.map(t => [t.id, t])),
         horse: Object.fromEntries(horses.map(h => [h.id, h])),
         cls: Object.fromEntries(classes.map(c => [c.id, c])),
@@ -407,6 +410,8 @@ function homeExtras(t){
       <span class="s">${n === 0 ? "aujourd’hui" : n === 1 ? "demain" : "dans " + n + " j"}</span></button></section>`;
   }
   const tasks = openTasks(D.deadlines).slice(0, 5);
+  const exp = (VAULT?.docs || []).filter(d => d.expires && daysBetween(t, d.expires) < 183);
+  if(exp.length) html += `<section><h3>Documents à renouveler</h3>${exp.map(d => `<a class="row" href="#coffre"><h3>${esc(d.label)}</h3><div class="meta">${d.expires < t ? "Expiré depuis le" : "Expire le"} ${esc(fmt(d.expires,{day:"numeric",month:"long",year:"numeric"}))}</div></a>`).join("")}</section>`;
   const upcomingTrips = new Set(D.trips.filter(x => (x.end_date || x.start_date || "9999") >= t).map(x => x.id));
   const toBook = D.bookings.filter(b => b.status === "afaire" && upcomingTrips.has(b.trip_id)).sort(sortBk);
   if(tasks.length || toBook.length){
@@ -464,6 +469,7 @@ function viewVoyage(id){
     </section>
     <section><div class="toolbar" style="margin-top:0"><h3>Échéances</h3><button class="btn small" data-new="dl" data-trip="${id}">Ajouter</button></div>
       ${tasks.map(d => taskRow(d, false)).join("") || `<p class="empty">Rien à prévoir pour ce voyage.</p>`}</section>
+    ${valiseHtml(x)}
     ${ex.length ? `<section><h3>Dépenses partagées</h3>${ex.map(exRow).join("")}<a class="back" href="#finances">Voir le solde avec Maria</a></section>` : ""}`;
 }
 
@@ -499,6 +505,199 @@ function viewFinances(){
     ${done.length ? `<details><summary>Déjà réglé (${done.length})</summary>${done.map(exRow).join("")}</details>` : ""}`;
 }
 
+// ---------- Étape 3 : coffre-fort chiffré ----------
+const TE = new TextEncoder(), TD = new TextDecoder();
+const b64 = u8 => { let s = ""; u8 = new Uint8Array(u8); for(let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let VKEY = null, VAULT = null, VURLS = [];
+const VKIND = { passeport:"Passeport", permis:"Permis", carte:"Carte", assurance:"Assurance", voyage:"Voyage (ESTA, visa)", autre:"Autre" };
+async function deriveKey(pass, salt){
+  const base = await crypto.subtle.importKey("raw", TE.encode(pass), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name:"PBKDF2", salt, iterations:310000, hash:"SHA-256" }, base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+}
+async function encBytes(bytes){ const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, VKEY, bytes); return { iv:b64(iv), ct }; }
+const decBytes = (iv, ct, key = VKEY) => crypto.subtle.decrypt({ name:"AES-GCM", iv:ub64(iv) }, key, ct);
+async function loadVault(){
+  const [s, v] = await Promise.all([ sb.from("perso_settings").select("value").eq("key","vault").maybeSingle(), sb.from("perso_vault").select("*").order("label") ]);
+  VAULT = { conf: s.data?.value || null, docs: v.data || [] };
+}
+function lockVault(){ VKEY = null; VURLS.forEach(URL.revokeObjectURL); VURLS = []; if($("#dlg").open && FORM?.kind === "vault") $("#dlg").close(); }
+
+function viewCoffre(){
+  if(!VAULT) { loadVault().then(render); return `<p class="empty">Chargement…</p>`; }
+  if(!VAULT.conf) return `<section><h3>Créer le code du coffre</h3>
+    <p>Vos documents sont chiffrés sur l’appareil avant d’être envoyés : ni Supabase, ni GitHub, ni Claude ne peuvent les lire sans ce code.</p>
+    <p class="neg"><b>Si vous oubliez ce code, le contenu du coffre est perdu.</b> Notez-le dans un endroit sûr.</p>
+    <div class="f"><label for="v1">Code (au moins 8 caractères)</label><input id="v1" type="password" autocomplete="new-password"></div>
+    <div class="f"><label for="v2">Confirmez le code</label><input id="v2" type="password" autocomplete="new-password"></div>
+    <button class="btn" data-vcreate>Créer le coffre</button><p class="msg" id="vMsg" role="status"></p></section>`;
+  if(!VKEY) return `<section><h3>Coffre verrouillé</h3>
+    <div class="f"><label for="vp">Code du coffre</label><input id="vp" type="password" autocomplete="current-password"></div>
+    <button class="btn" data-vunlock>Ouvrir</button><p class="msg" id="vMsg" role="status"></p>
+    <p class="muted">Le coffre se referme dès que vous quittez l’app.</p></section>`;
+  const t = todayISO();
+  const row = d => {
+    const left = d.expires ? daysBetween(t, d.expires) : null;
+    const chip = left === null ? "" : left < 0 ? `<span class="chip warn">Expiré</span>` : left < 183 ? `<span class="chip warn">Expire le ${esc(fmt(d.expires,{day:"numeric",month:"short",year:"numeric"}))}</span>` : `<span class="chip">Jusqu’au ${esc(fmt(d.expires,{month:"short",year:"numeric"}))}</span>`;
+    return `<button class="row" data-vdoc="${d.id}"><h3>${esc(d.label)}</h3><div class="meta">${esc(VKIND[d.kind] || "")}${d.files.length ? `, ${d.files.length} photo${d.files.length > 1 ? "s" : ""}` : ""}</div>
+      ${chip ? `<div class="shows" style="justify-content:flex-start">${chip}</div>` : ""}</button>`;
+  };
+  return `<div class="toolbar"><button class="btn small line" data-vlock>Verrouiller</button><button class="btn small" data-vnew>Ajouter un document</button></div>
+    <div style="margin-top:14px">${VAULT.docs.map(row).join("") || `<p class="empty">Le coffre est vide. Ajoutez votre passeport, vos permis et vos cartes, avec une photo de chacun.</p>`}</div>`;
+}
+async function vaultCreate(){
+  const a = $("#v1").value, b = $("#v2").value, m = $("#vMsg");
+  if(a.length < 8) return m.textContent = "Le code doit faire au moins 8 caractères.";
+  if(a !== b) return m.textContent = "Les deux codes ne sont pas identiques.";
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  VKEY = await deriveKey(a, salt);
+  const chk = await encBytes(TE.encode("murph-coffre-ok"));
+  const value = { salt:b64(salt), iv:chk.iv, check:b64(chk.ct), iterations:310000 };
+  const { error } = await sb.from("perso_settings").insert({ key:"vault", value });
+  if(error){ VKEY = null; return m.textContent = "Pas enregistré : " + error.message; }
+  VAULT.conf = value; render(); toast("Coffre créé");
+}
+async function vaultUnlock(){
+  const m = $("#vMsg"); m.textContent = "Vérification…";
+  try{
+    const c = VAULT.conf, key = await deriveKey($("#vp").value, ub64(c.salt));
+    const ok = TD.decode(await decBytes(c.iv, ub64(c.check), key));
+    if(ok !== "murph-coffre-ok") throw 0;
+    VKEY = key; render();
+  } catch(e){ m.textContent = "Code incorrect."; }
+}
+async function shrinkImage(file){
+  if(!file.type.startsWith("image/")) return file;
+  try{
+    const bmp = await createImageBitmap(file), max = 2200, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(b => r(b || file), "image/jpeg", .86));
+  } catch(e){ return file; }
+}
+async function openVaultDoc(doc){
+  const isNew = !doc;
+  let data = { number:"", notes:"" };
+  if(doc?.enc_data){ try{ data = JSON.parse(TD.decode(await decBytes(doc.enc_iv, ub64(doc.enc_data)))); } catch(e){} }
+  FORM = { kind:"vault", id:doc?.id, files:[...(doc?.files || [])], removed:[] };
+  $("#frm").innerHTML = `<h2>${isNew ? "Nouveau document" : esc(doc.label)}</h2>
+    ${inp("label","Nom (ex. Passeport belge)",doc?.label,"text","required")}
+    <div class="f2">${sel("kind","Type",opt(Object.entries(VKIND), doc?.kind || "passeport"))}${inp("expires","Expire le",doc?.expires,"date")}</div>
+    ${inp("number","Numéro",data.number,"text",'autocomplete="off"')}
+    ${area("notes","Notes (lieu de délivrance, contact…)",data.notes)}
+    <div class="f"><label>Photos ou PDF</label><div id="vfiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px"></div>
+      <input id="f_upl" type="file" accept="image/*,application/pdf" multiple style="margin-top:8px"></div>
+    <p class="muted">Le nom, le type et la date d’expiration restent lisibles pour les rappels. Le numéro, les notes et les photos sont chiffrés.</p>
+    <p class="msg" id="frmMsg" role="status"></p>
+    <div class="actions">${isNew ? "" : `<button type="button" class="btn danger small" data-vdel>Supprimer</button>`}<span class="sp"></span>
+      <button type="button" class="btn ghost small" data-close>Annuler</button><button type="submit" class="btn small">${isNew ? "Ajouter" : "Enregistrer"}</button></div>`;
+  $("#dlg").showModal();
+  const box = $("#vfiles");
+  for(const f of FORM.files){
+    const cell = document.createElement("div"); cell.className = "muted"; cell.textContent = "Déchiffrement…"; box.append(cell);
+    try{
+      const { data:blob, error } = await sb.storage.from("perso-vault").download(f.path); if(error) throw error;
+      const plain = await decBytes(f.iv, await blob.arrayBuffer());
+      const url = URL.createObjectURL(new Blob([plain], { type:f.type })); VURLS.push(url);
+      cell.innerHTML = (f.type.startsWith("image/") ? `<a href="${url}" target="_blank"><img src="${url}" alt="${esc(f.name)}" style="width:100%;border-radius:6px;display:block"></a>` : `<a class="link" href="${url}" target="_blank">${esc(f.name)}</a>`)
+        + `<button type="button" class="btn ghost small" style="margin:0;padding:4px 0" data-vrm="${esc(f.path)}">Retirer</button>`;
+    } catch(e){ cell.textContent = "Fichier illisible."; }
+  }
+}
+async function saveVaultDoc(){
+  const fd = new FormData($("#frm")), m = $("#frmMsg"); m.textContent = "Chiffrement…";
+  try{
+    const up = $("#f_upl").files;
+    for(const file of up){
+      const small = await shrinkImage(file);
+      const { iv, ct } = await encBytes(await small.arrayBuffer());
+      const path = crypto.randomUUID();
+      const { error } = await sb.storage.from("perso-vault").upload(path, new Blob([ct], { type:"application/octet-stream" }));
+      if(error) throw error;
+      FORM.files.push({ path, iv, name:file.name, type: small.type || file.type });
+    }
+    const secret = await encBytes(TE.encode(JSON.stringify({ number: fd.get("number") || "", notes: fd.get("notes") || "" })));
+    const row = { label: String(fd.get("label")).trim(), kind: fd.get("kind"), expires: fd.get("expires") || null, enc_iv: secret.iv, enc_data: b64(secret.ct), files: FORM.files };
+    const { error } = FORM.id ? await sb.from("perso_vault").update(row).eq("id", FORM.id) : await sb.from("perso_vault").insert(row);
+    if(error) throw error;
+    if(FORM.removed.length) await sb.storage.from("perso-vault").remove(FORM.removed);
+    $("#dlg").close(); await loadVault(); render(); toast(FORM.id ? "Modifié" : "Ajouté");
+  } catch(e){ m.textContent = "Pas enregistré : " + (e.message || e); }
+}
+
+// ---------- Étape 3 : valise et météo ----------
+const WX = {};
+const addDays = (iso, n) => { const d = toDate(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10); };
+const minusYear = iso => { const [y,m,d] = iso.split("-"); return `${+y - 1}-${m}-${m === "02" && d === "29" ? "28" : d}`; };
+async function getWeather(x){
+  if(WX[x.id]) return WX[x.id];
+  if(x.lat == null || !x.start_date) return null;
+  const t = todayISO(), s = x.start_date, e = x.end_date || s;
+  let url, label;
+  const base = `latitude=${x.lat}&longitude=${x.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`;
+  if(daysBetween(t, s) <= 14 && e >= t){
+    const s2 = s < t ? t : s, lim = addDays(t, 15), e2 = e > lim ? lim : e;
+    url = `https://api.open-meteo.com/v1/forecast?${base}&start_date=${s2}&end_date=${e2}`; label = "Prévisions";
+  } else if(e < addDays(t, -6)){
+    url = `https://archive-api.open-meteo.com/v1/archive?${base}&start_date=${s}&end_date=${e}`; label = "Météo observée";
+  } else {
+    url = `https://archive-api.open-meteo.com/v1/archive?${base}&start_date=${minusYear(s)}&end_date=${minusYear(e)}`; label = "Météo de l’an dernier aux mêmes dates";
+  }
+  try{
+    const r = await fetch(url); if(!r.ok) throw 0;
+    const d = (await r.json()).daily, mx = d.temperature_2m_max.filter(v => v != null), mn = d.temperature_2m_min.filter(v => v != null);
+    WX[x.id] = { label, tmax: Math.round(Math.max(...mx)), tmin: Math.round(Math.min(...mn)),
+      avgMax: Math.round(mx.reduce((a,b) => a+b, 0) / mx.length), rainDays: d.precipitation_sum.filter(v => v >= 2).length, n: mx.length };
+  } catch(e){ WX[x.id] = { error:true }; }
+  return WX[x.id];
+}
+function wxItems(w){
+  if(!w || w.error) return [];
+  const it = [];
+  if(w.tmin < 10) it.push("Veste chaude ou polaire");
+  if(w.tmin < 3) it.push("Bonnet, écharpe et gants chauds");
+  if(w.avgMax >= 27) it.push("Vêtements légers");
+  if(w.tmax >= 20) it.push("Casquette, lunettes de soleil, crème solaire");
+  if(w.rainDays >= 2) it.push("Imperméable et bottes de pluie");
+  if(w.tmax - w.tmin >= 14) it.push("Tenues en couches (matins frais, après-midi chauds)");
+  return it;
+}
+const wxText = w => !w ? "Indiquez une ville pour la météo dans « Modifier »." : w.error ? "Météo indisponible pour l’instant."
+  : `${w.label} : de ${w.tmin} à ${w.tmax} °C (maximales autour de ${w.avgMax} °C)${w.rainDays ? `, ${w.rainDays} jour${w.rainDays > 1 ? "s" : ""} de pluie` : ", sans pluie notable"}.`;
+function valiseHtml(x){
+  const items = D.packing.filter(p => p.trip_id === x.id).sort((a,b) => a.sort - b.sort || a.label.localeCompare(b.label));
+  let h = `<section><div class="toolbar" style="margin-top:0"><h3>Valise</h3>${items.length ? `<button class="btn small" data-new="pk" data-trip="${x.id}">Ajouter</button>` : ""}</div>
+    <p class="muted" id="wx-${x.id}" style="margin-top:0">Météo en cours de chargement…</p>`;
+  if(!items.length) return h + `<button class="btn" data-pack="${x.id}">Préparer la valise</button><p class="muted">Reprend votre liste habituelle et ajoute ce qu’il faut selon la météo.</p></section>`;
+  const done = items.filter(p => p.packed).length, cats = {};
+  items.forEach(p => (cats[p.category] ||= []).push(p));
+  h += `<p><b>${done} sur ${items.length}</b> dans la valise. <button class="btn ghost small" style="margin:0;padding:0" data-wxadd="${x.id}">Mettre à jour selon la météo</button></p>`;
+  h += Object.entries(cats).map(([c, list]) => `<details ${list.every(p => p.packed) ? "" : "open"}><summary>${esc(c)} (${list.filter(p => p.packed).length}/${list.length})</summary>
+    ${list.map(p => `<div class="task${p.packed ? " done" : ""}"><input type="checkbox" aria-label="Dans la valise" data-pk="${p.id}" ${p.packed ? "checked" : ""}><span class="tx" data-edit-pk="${p.id}">${esc(p.label)}</span></div>`).join("")}</details>`).join("");
+  return h + `</section>`;
+}
+async function fillWeather(x){
+  const w = await getWeather(x), el = document.getElementById("wx-" + x.id);
+  if(el) el.textContent = wxText(w);
+}
+async function prepareValise(tripId, onlyWeather){
+  const x = tripOf(tripId), w = await getWeather(x);
+  const have = new Set(D.packing.filter(p => p.trip_id === tripId).map(p => p.label));
+  const rows = [];
+  if(!onlyWeather) D.packing.filter(p => !p.trip_id).forEach(p => rows.push({ trip_id:tripId, category:p.category, label:p.label, sort:p.sort, source:"base" }));
+  wxItems(w).forEach((l, i) => { if(!have.has(l)) rows.push({ trip_id:tripId, category:"Selon la météo", label:l, sort:60 + i, source:"meteo" }); });
+  if(!rows.length) return toast("Rien à ajouter");
+  const { error } = await sb.from("perso_packing").insert(rows);
+  if(error) return toast("Pas enregistré : " + error.message);
+  refresh(onlyWeather ? `${rows.length} ajout${rows.length > 1 ? "s" : ""} selon la météo` : "Valise prête");
+}
+async function geocode(place){
+  try{
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=fr&name=${encodeURIComponent(place.split(",")[0].trim())}`);
+    const g = (await r.json()).results?.[0]; return g ? { lat:g.latitude, lon:g.longitude } : null;
+  } catch(e){ return null; }
+}
+
 // ---------- Formulaires ----------
 const tripOpts = sel => `<option value="">Aucun</option>` + D.trips.map(x => `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(x.title)}</option>`).join("");
 const opt = (pairs, sel) => pairs.map(([v, l]) => `<option value="${v}"${v === (sel ?? "") ? " selected" : ""}>${esc(l)}</option>`).join("");
@@ -515,6 +714,7 @@ function openForm(kind, row, preset = {}){
       ${inp("title","Nom du voyage",r.title,"text","required")}
       ${inp("location","Lieu",r.location)}
       <div class="f2">${inp("start_date","Départ",r.start_date,"date")}${inp("end_date","Retour",r.end_date,"date")}</div>
+      ${inp("weather_place","Ville pour la météo (ex. Ocala)",r.weather_place)}
       <div class="f"><label>Shows de ce voyage</label>${D.shows.filter(s => s.end_date >= todayISO() || (r.show_ids||[]).includes(s.id)).map(s =>
         `<label style="font-weight:400;display:flex;gap:8px;margin:6px 0"><input type="checkbox" name="show_ids" value="${s.id}" ${(r.show_ids||[]).includes(s.id) ? "checked" : ""} style="width:auto">${esc(s.name)} <span class="muted">${esc(fmtRange(s.start_date, s.end_date))}</span></label>`).join("")}</div>
       ${area("notes","Notes",r.notes)}`;
@@ -532,6 +732,12 @@ function openForm(kind, row, preset = {}){
       <div class="f2">${inp("reference","Référence",r.reference)}${inp("ticket","N° de billet",r.ticket)}</div>
       <div class="f2">${inp("cost","Montant",r.cost,"number",'step="0.01" inputmode="decimal"')}${sel("currency","Devise",opt([["USD","$ US"],["EUR","€"]], r.currency || "USD"))}</div>
       ${area("notes","Notes",r.notes)}`;
+  } else if(kind === "pk"){
+    const cats = [...new Set(D.packing.map(p => p.category).concat(["Divers"]))];
+    body = `<h2>${isNew ? "Ajouter à la valise" : "Élément de la valise"}</h2>
+      ${inp("label","Quoi",r.label,"text","required")}
+      ${sel("category","Rubrique",opt(cats.map(c => [c, c]), r.category || "Divers"))}
+      <input type="hidden" name="trip_id" value="${esc(r.trip_id || "")}">`;
   } else if(kind === "dl"){
     body = `<h2>${isNew ? "Nouvelle échéance" : "Échéance"}</h2>
       ${inp("title","Quoi",r.title,"text","required")}
@@ -559,10 +765,11 @@ function openForm(kind, row, preset = {}){
   const sp = $("#f_split"); if(sp) sp.onchange = () => $("#customBox").hidden = sp.value !== "custom";
   $("#dlg").showModal();
 }
-const TABLE = { trip:"perso_trips", bk:"perso_bookings", dl:"perso_deadlines", ex:"perso_expenses" };
+const TABLE = { trip:"perso_trips", bk:"perso_bookings", dl:"perso_deadlines", ex:"perso_expenses", pk:"perso_packing" };
 function collect(kind){
   const fd = new FormData($("#frm")), v = k => { const x = fd.get(k); return x === null || x === "" ? null : String(x).trim(); };
-  if(kind === "trip") return { title:v("title"), location:v("location"), start_date:v("start_date"), end_date:v("end_date"), notes:v("notes"), show_ids: fd.getAll("show_ids") };
+  if(kind === "trip") return { title:v("title"), location:v("location"), start_date:v("start_date"), end_date:v("end_date"), notes:v("notes"), show_ids: fd.getAll("show_ids"), weather_place:v("weather_place") };
+  if(kind === "pk") return { category:v("category") || "Divers", label:v("label"), trip_id:v("trip_id") };
   if(kind === "bk") return Object.fromEntries(["kind","status","title","trip_id","start_date","start_time","end_date","end_time","origin","destination","flight_no","seat","provider","cabin","reference","ticket","currency","notes"].map(k => [k, v(k)]).concat([["cost", v("cost") === null ? null : Number(v("cost"))]]));
   if(kind === "dl") return { title:v("title"), due_date:v("due_date"), status:v("status"), trip_id:v("trip_id"), notes:v("notes") };
   if(kind === "ex"){
@@ -577,7 +784,16 @@ function collect(kind){
 }
 $("#frm").addEventListener("submit", async ev => {
   ev.preventDefault();
+  if(FORM.kind === "vault") return saveVaultDoc();
   const data = collect(FORM.kind), t = TABLE[FORM.kind];
+  if(FORM.kind === "trip"){
+    const old = FORM.id ? tripOf(FORM.id) : null;
+    if(data.weather_place && (!old || old.weather_place !== data.weather_place || old.lat == null)){
+      const g = await geocode(data.weather_place); if(g){ data.lat = g.lat; data.lon = g.lon; }
+    }
+    if(!data.weather_place){ data.lat = null; data.lon = null; }
+    if(FORM.id) delete WX[FORM.id];
+  }
   const q = FORM.id ? sb.from(t).update(data).eq("id", FORM.id) : sb.from(t).insert(data);
   const { error } = await q;
   if(error){ $("#frmMsg").textContent = "Pas enregistré : " + error.message; return; }
@@ -585,6 +801,16 @@ $("#frm").addEventListener("submit", async ev => {
 });
 $("#frm").addEventListener("click", async ev => {
   if(ev.target.closest("[data-close]")) $("#dlg").close();
+  const rm = ev.target.closest("[data-vrm]");
+  if(rm){ FORM.removed.push(rm.dataset.vrm); FORM.files = FORM.files.filter(f => f.path !== rm.dataset.vrm); rm.parentElement.remove(); return; }
+  if(ev.target.closest("[data-vdel]")){
+    if(!confirm("Supprimer ce document et ses photos ?")) return;
+    const doc = VAULT.docs.find(d => d.id === FORM.id);
+    const { error } = await sb.from("perso_vault").delete().eq("id", FORM.id);
+    if(error){ $("#frmMsg").textContent = "Pas supprimé : " + error.message; return; }
+    const paths = (doc?.files || []).map(f => f.path); if(paths.length) await sb.storage.from("perso-vault").remove(paths);
+    $("#dlg").close(); await loadVault(); render(); toast("Supprimé"); return;
+  }
   if(ev.target.closest("[data-del]")){
     if(!confirm("Supprimer définitivement ?")) return;
     const { error } = await sb.from(TABLE[FORM.kind]).delete().eq("id", FORM.id);
@@ -599,15 +825,16 @@ $("#frm").addEventListener("click", async ev => {
 function route(){
   const h = location.hash.slice(1) || "accueil";
   if(h.startsWith("voyage-")) return { v:"voyages", id:h.slice(7) };
-  return { v: ["accueil","concours","voyages","finances"].includes(h) ? h : "accueil" };
+  return { v: ["accueil","concours","voyages","finances","coffre"].includes(h) ? h : "accueil" };
 }
-const TITLES = { accueil:"Accueil", concours:"Concours", voyages:"Voyages", finances:"Finances" };
+const TITLES = { accueil:"Accueil", concours:"Concours", voyages:"Voyages", finances:"Finances", coffre:"Coffre-fort" };
 function render(){
   if(!D) return;
   const { v, id } = route();
   $("#title").textContent = TITLES[v];
   document.querySelectorAll("nav a").forEach(a => a.dataset.v === v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
-  $("#main").innerHTML = v === "concours" ? viewConcours() : v === "voyages" ? (id ? viewVoyage(id) : viewVoyages()) : v === "finances" ? viewFinances() : viewAccueil();
+  $("#main").innerHTML = v === "concours" ? viewConcours() : v === "voyages" ? (id ? viewVoyage(id) : viewVoyages()) : v === "finances" ? viewFinances() : v === "coffre" ? viewCoffre() : viewAccueil();
+  if(v === "voyages" && id && tripOf(id)) fillWeather(tripOf(id));
 }
 $("#main").addEventListener("click", async ev => {
   const g = s => ev.target.closest(s);
@@ -617,6 +844,14 @@ $("#main").addEventListener("click", async ev => {
   if(b = g("[data-edit-dl]")) return openForm("dl", D.deadlines.find(x => x.id === b.dataset.editDl));
   if(b = g("[data-edit-ex]")) return openForm("ex", D.expenses.find(x => x.id === b.dataset.editEx));
   if(b = g("[data-edit-trip]")) return openForm("trip", tripOf(b.dataset.editTrip));
+  if(b = g("[data-edit-pk]")) return openForm("pk", D.packing.find(x => x.id === b.dataset.editPk));
+  if(b = g("[data-pack]")){ b.disabled = true; return prepareValise(b.dataset.pack, false); }
+  if(b = g("[data-wxadd]")) return prepareValise(b.dataset.wxadd, true);
+  if(g("[data-vcreate]")) return vaultCreate();
+  if(g("[data-vunlock]")) return vaultUnlock();
+  if(g("[data-vlock]")){ lockVault(); return render(); }
+  if(g("[data-vnew]")) return openVaultDoc(null);
+  if(b = g("[data-vdoc]")) return openVaultDoc(VAULT.docs.find(d => d.id === b.dataset.vdoc));
   if(b = g("[data-new]")){
     const tr = b.dataset.trip || (route().id ?? null);
     return openForm(b.dataset.new, null, b.dataset.new === "trip" ? {} : { trip_id: tr });
@@ -630,7 +865,15 @@ $("#main").addEventListener("click", async ev => {
     refresh("Réglé");
   }
 });
+$("#main").addEventListener("keydown", ev => { if(ev.key === "Enter" && ev.target.id === "vp") vaultUnlock(); });
 $("#main").addEventListener("change", async ev => {
+  const p = ev.target.closest("input[data-pk]");
+  if(p){
+    const { error } = await sb.from("perso_packing").update({ packed: p.checked }).eq("id", p.dataset.pk);
+    if(error){ p.checked = !p.checked; return toast("Pas enregistré : " + error.message); }
+    const it = D.packing.find(x => x.id === p.dataset.pk); if(it) it.packed = p.checked;
+    p.closest(".task").classList.toggle("done", p.checked); return;
+  }
   const c = ev.target.closest("input[data-done]"); if(!c) return;
   const { error } = await sb.from("perso_deadlines").update({ status: c.checked ? "fait" : "afaire" }).eq("id", c.dataset.done);
   if(error){ c.checked = !c.checked; return toast("Pas enregistré : " + error.message); }
@@ -645,7 +888,10 @@ async function start(){
   try { await load(); render(); }
   catch(e){ $("#main").innerHTML = `<p class="empty">Les données ne se chargent pas (${esc(e.message)}). Vérifiez la connexion internet, puis rouvrez l’app.</p>`; }
 }
-document.addEventListener("visibilitychange", () => { if(!document.hidden && D) load().then(render).catch(()=>{}); });
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden){ if(VKEY){ lockVault(); if(route().v === "coffre") render(); } return; }
+  if(D && !$("#dlg").open) load().then(render).catch(()=>{});
+});
 
 (async () => {
   const { data:{ session } } = await sb.auth.getSession();
