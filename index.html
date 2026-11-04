@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Murph</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Murph">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#17383B">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --paper:#F3F1E8; --card:#FFFFFF; --ink:#1B2B2D; --soft:#5D6B6C; --line:#DAD8CC;
+  --teal:#17383B; --turq:#2A9D9A; --saddle:#8C5A2E; --warn:#B4492C;
+  --num-bg:#FFFFFF; --num-ink:#17383B;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{ --paper:#0F1E20; --card:#172B2E; --ink:#ECEFE6; --soft:#9DB0AE; --line:#29413F;
+    --teal:#0B1A1C; --turq:#4CC3BF; --saddle:#D19A63; --warn:#E5785B;
+    --num-bg:#ECEFE6; --num-ink:#0F1E20; color-scheme:dark; }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);
+  font:16px/1.5 Figtree,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--teal)}
+h1,h2,h3{font-family:"Young Serif",Georgia,serif;font-weight:400;margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--turq);outline-offset:2px}
+main{max-width:640px;margin:0 auto;padding:0 18px 110px}
+.top{background:var(--teal);color:#F3F1E8;padding:18px 18px 64px}
+.top .in{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:baseline}
+.top h1{font-size:1.35rem}
+.top small{opacity:.75}
+
+/* Le dossard : élément signature */
+.bib{position:relative;margin:-48px auto 0;background:var(--num-bg);color:var(--num-ink);
+  border-radius:10px;padding:22px 22px 20px;box-shadow:0 14px 30px -18px rgba(10,30,32,.55)}
+.bib::before,.bib::after{content:"";position:absolute;top:14px;width:12px;height:12px;border-radius:50%;
+  background:var(--paper);box-shadow:inset 0 0 0 2px var(--turq)}
+.bib::before{left:14px}.bib::after{right:14px}
+.bib .when{font-size:.9rem;color:var(--soft);text-align:center;margin:0}
+.bib .num{font-family:"Young Serif",Georgia,serif;font-size:clamp(4.5rem,24vw,7.5rem);line-height:1;text-align:center;
+  letter-spacing:-.02em;margin:6px 0 2px}
+.bib .unit{text-align:center;font-weight:600;margin:0 0 14px}
+.bib h2{font-size:1.5rem;text-align:center;line-height:1.2}
+.bib .where{text-align:center;color:var(--soft);margin:6px 0 0}
+.bib .shows{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:.85rem;color:var(--ink);background:transparent}
+.chip.on{border-color:var(--turq);color:var(--turq)}
+.chip.warn{border-color:var(--warn);color:var(--warn)}
+
+section{margin-top:30px}
+section > h3{font-size:1.15rem;margin-bottom:10px}
+.horse{border-left:3px solid var(--saddle);padding:2px 0 2px 14px;margin:0 0 18px}
+.horse h4{margin:0 0 4px;font-size:1.05rem}
+.horse h4 span{font-weight:400;color:var(--soft);font-size:.9rem}
+.day{display:grid;grid-template-columns:5.6rem 1fr;gap:2px 10px;margin:6px 0}
+.day dt{color:var(--soft);font-size:.9rem}
+.day dd{margin:0}
+.day dd div{margin-bottom:2px}
+.day b{font-variant-numeric:tabular-nums}
+.muted{color:var(--soft);font-size:.92rem}
+.next{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.next:last-child{border-bottom:1px solid var(--line)}
+.next .d{color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+.show{background:var(--card);border-radius:8px;margin-bottom:12px;border:1px solid var(--line)}
+.show > button{all:unset;display:block;width:100%;padding:14px 16px;cursor:pointer;box-sizing:border-box}
+.show > button:focus-visible{outline:3px solid var(--turq);border-radius:8px}
+.show h3{font-size:1.1rem;line-height:1.25}
+.show .meta{color:var(--soft);font-size:.9rem;margin-top:3px}
+.show .body{padding:0 16px 14px}
+.show[data-past] {opacity:.6}
+.link{color:var(--turq);font-weight:600;text-decoration:none}
+
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:4px;z-index:5}
+nav a{flex:0 1 150px;text-align:center;padding:8px 6px;border-radius:8px;color:var(--soft);text-decoration:none;font-weight:600;font-size:.95rem}
+nav a[aria-current=page]{color:var(--turq);background:color-mix(in srgb,var(--turq) 12%,transparent)}
+
+.login{max-width:380px;margin:12vh auto 0;padding:0 22px}
+.login h1{font-size:2rem;margin-bottom:6px}
+.login label{display:block;font-weight:600;margin:18px 0 6px}
+.login input{width:100%;font:inherit;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.btn{display:inline-block;margin-top:14px;padding:12px 18px;border:0;border-radius:8px;background:var(--turq);color:#fff;font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--soft);padding:12px 0;margin-left:14px}
+.msg{min-height:1.5em;margin-top:12px;color:var(--warn)}
+.empty{padding:24px 0;color:var(--soft)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:no-preference){ .bib{animation:drop .5s ease-out both} @keyframes drop{from{transform:translateY(-10px);opacity:0}} }
+</style>
+</head>
+<body>
+
+<div id="vLogin" class="login" hidden>
+  <h1>Murph</h1>
+  <p class="muted">Espace privé. Connexion par code reçu par e-mail, avec la même adresse que TRPH.</p>
+  <label for="email">Adresse e-mail</label>
+  <input id="email" type="email" autocomplete="email" value="dhondtmf@gmail.com">
+  <div id="codeBox" hidden>
+    <label for="code">Code reçu par e-mail</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+  </div>
+  <button class="btn" id="bLogin">Recevoir le code</button>
+  <p class="msg" id="loginMsg" role="status"></p>
+</div>
+
+<div id="vApp" hidden>
+  <header class="top"><div class="in"><h1 id="title">Accueil</h1><small id="today"></small></div></header>
+  <main id="main"></main>
+  <nav>
+    <a href="#accueil" data-v="accueil">Accueil</a>
+    <a href="#concours" data-v="concours">Concours</a>
+  </nav>
+</div>
+
+<script>
+const SUPABASE_URL = "https://atcebetkiqisdgieodzr.supabase.co";
+const SUPABASE_KEY = "sb_publishable_OUmTm-auj3Wyx6TZBsxu3A_ke8EIVKE";
+const TRPH_URL = "https://trph-app.github.io/Trph/";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let D = null; // données chargées
+
+// ---------- Dates ----------
+const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+const toDate = iso => new Date(iso + "T12:00:00");
+const daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / 864e5);
+const fmt = (iso, o) => toDate(iso).toLocaleDateString("fr-BE", o);
+const fmtDay = iso => fmt(iso, {weekday:"short", day:"numeric", month:"short"});
+function fmtRange(a, b){
+  if(!a) return "";
+  if(!b || a === b) return fmt(a, {day:"numeric", month:"long", year:"numeric"});
+  const A = toDate(a), B = toDate(b);
+  if(A.getFullYear() === B.getFullYear()){
+    if(A.getMonth() === B.getMonth()) return `${A.getDate()}–${fmt(b,{day:"numeric",month:"long",year:"numeric"})}`;
+    return `${fmt(a,{day:"numeric",month:"short"})} – ${fmt(b,{day:"numeric",month:"short",year:"numeric"})}`;
+  }
+  return `${fmt(a,{day:"numeric",month:"short",year:"numeric"})} – ${fmt(b,{day:"numeric",month:"short",year:"numeric"})}`;
+}
+
+// ---------- Connexion ----------
+let codeSent = false;
+$("#bLogin").onclick = async () => {
+  const email = $("#email").value.trim().toLowerCase(), m = $("#loginMsg");
+  m.textContent = "";
+  if(!codeSent){
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:false } });
+    if(error){ m.textContent = "Envoi impossible : " + error.message; return; }
+    codeSent = true; $("#codeBox").hidden = false; $("#bLogin").textContent = "Se connecter";
+    m.style.color = "var(--soft)"; m.textContent = "Code envoyé. Regardez votre boîte Gmail."; $("#code").focus();
+  } else {
+    const { error } = await sb.auth.verifyOtp({ email, token: $("#code").value.trim(), type:"email" });
+    if(error){ m.style.color = ""; m.textContent = "Code refusé : vérifiez-le ou redemandez-en un."; return; }
+    start();
+  }
+};
+
+// ---------- Chargement ----------
+async function load(){
+  const { data:{ user } } = await sb.auth.getUser();
+  const email = (user?.email || "").toLowerCase();
+  const [me, trips, shows] = await Promise.all([
+    sb.from("people").select("id,name").eq("email", email).maybeSingle(),
+    sb.from("perso_trips").select("*").order("start_date"),
+    sb.from("shows").select("id,name,location,start_date,end_date,entries_close").order("start_date")
+  ]);
+  if(trips.error) throw new Error("perso: " + trips.error.message);
+  if(shows.error) throw new Error("shows: " + shows.error.message);
+  const meId = me.data?.id;
+  let entries = [], horses = [], classes = [];
+  if(meId){
+    const e = await sb.from("entries").select("id,show_id,horse_id,owner_id,shown_by,classes,class_ids")
+      .or(`owner_id.eq.${meId},shown_by.eq.${meId}`);
+    entries = e.data || [];
+    const hIds = [...new Set(entries.map(x => x.horse_id))];
+    const cIds = [...new Set(entries.flatMap(x => x.class_ids || []))];
+    const [h, c] = await Promise.all([
+      hIds.length ? sb.from("horses").select("id,barn_name,registered_name").in("id", hIds) : {data:[]},
+      cIds.length ? sb.from("show_classes").select("id,show_id,class_no,name,class_date,start_time,time_note,arena,sort_order").in("id", cIds) : {data:[]}
+    ]);
+    horses = h.data || []; classes = c.data || [];
+  }
+  D = { meId, trips: trips.data, shows: shows.data, entries,
+        horse: Object.fromEntries(horses.map(h => [h.id, h])),
+        cls: Object.fromEntries(classes.map(c => [c.id, c])),
+        show: Object.fromEntries(shows.data.map(s => [s.id, s])) };
+}
+
+// ---------- Blocs communs ----------
+function horseBlock(e, meId, onlyFrom){
+  const h = D.horse[e.horse_id] || {};
+  const role = e.shown_by === meId ? "je monte" : "monté par Torey ou son équipe";
+  const sched = (e.class_ids || []).map(id => D.cls[id]).filter(Boolean)
+    .filter(c => !onlyFrom || !c.class_date || c.class_date >= onlyFrom)
+    .sort((a,b) => (a.class_date||"").localeCompare(b.class_date||"") || (a.sort_order??0)-(b.sort_order??0));
+  const byDay = {};
+  sched.forEach(c => (byDay[c.class_date || "—"] ||= []).push(c));
+  const days = Object.entries(byDay).map(([d, cs]) => `
+    <dl class="day"><dt>${d === "—" ? "Date à venir" : esc(fmtDay(d))}</dt><dd>${cs.map(c =>
+      `<div>${c.class_no ? `<b>${esc(c.class_no)}</b> ` : ""}${esc(c.name)}${c.start_time ? ` <span class="muted">${esc(c.start_time.slice(0,5))}</span>` : ""}${c.arena ? ` <span class="muted">${esc(c.arena)}</span>` : ""}</div>`).join("")}</dd></dl>`).join("");
+  const rest = (e.classes || []).filter(Boolean);
+  const restHtml = rest.length ? `<p class="muted">${sched.length ? "Pas encore au programme du show" : "Classes prévues (programme du show pas encore importé)"} : ${rest.map(esc).join(", ")}</p>` : "";
+  return `<div class="horse"><h4>${esc(h.barn_name || "Cheval")} <span>${esc(role)}</span></h4>
+    ${days || (rest.length ? "" : `<p class="muted">Aucune classe cochée pour l’instant.</p>`)}${restHtml}</div>`;
+}
+
+// ---------- Accueil ----------
+function viewAccueil(){
+  const t = todayISO();
+  const upcoming = D.trips.filter(x => (x.end_date || x.start_date) >= t);
+  const cur = upcoming[0];
+  if(!cur) return `<div class="bib"><p class="when">Aucun voyage prévu</p><h2>Ajoutez votre prochain show</h2></div>`;
+  const live = cur.start_date <= t;
+  const n = live ? daysBetween(cur.start_date, t) + 1 : daysBetween(t, cur.start_date);
+  const total = daysBetween(cur.start_date, cur.end_date) + 1;
+  const when = live ? "En cours" : (n === 1 ? "Départ demain" : "Départ dans");
+  const unit = live ? `jour sur ${total}` : (n === 1 ? "jour" : "jours");
+  const shows = (cur.show_ids || []).map(id => D.show[id]).filter(Boolean);
+  const showEntries = D.entries.filter(e => (cur.show_ids || []).includes(e.show_id));
+  const closing = shows.filter(s => s.entries_close && s.entries_close >= t);
+
+  let html = `<div class="bib" role="group" aria-label="Prochain show">
+    <p class="when">${when}</p>
+    <div class="num">${n}</div>
+    <p class="unit">${unit}</p>
+    <h2>${esc(shows.length === 1 ? shows[0].name : cur.title)}</h2>
+    <p class="where">${esc(shows[0]?.location || cur.location || "")}<br>${esc(fmtRange(cur.start_date, cur.end_date))}</p>
+    ${shows.length > 1 ? `<div class="shows">${shows.map(s => `<span class="chip on">${esc(s.name)}</span>`).join("")}</div>` : ""}
+    ${closing.length ? `<div class="shows">${closing.map(s => `<span class="chip warn">Inscriptions avant le ${esc(fmt(s.entries_close,{day:"numeric",month:"long"}))}</span>`).join("")}</div>` : ""}
+  </div>`;
+
+  html += `<section><h3>Mes chevaux sur ce voyage</h3>`;
+  html += showEntries.length
+    ? shows.map(s => {
+        const es = showEntries.filter(e => e.show_id === s.id);
+        if(!es.length) return "";
+        return (shows.length > 1 ? `<p class="muted" style="margin:0 0 8px">${esc(s.name)}</p>` : "") +
+          es.map(e => horseBlock(e, D.meId, live ? t : null)).join("");
+      }).join("")
+    : `<p class="empty">Aucun cheval inscrit dans TRPH pour ce voyage.</p>`;
+  html += `</section>`;
+
+  const later = upcoming.slice(1, 4);
+  if(later.length){
+    html += `<section><h3>Ensuite</h3>${later.map(x => `<div class="next"><span>${esc(x.title)}</span><span class="d">${esc(fmtRange(x.start_date, x.end_date))}</span></div>`).join("")}</section>`;
+  }
+  return html;
+}
+
+// ---------- Concours ----------
+const openShows = new Set();
+function viewConcours(){
+  const t = todayISO();
+  const mine = new Set(D.entries.map(e => e.show_id));
+  D.trips.forEach(x => (x.show_ids || []).forEach(id => mine.add(id)));
+  const list = D.shows.filter(s => mine.has(s.id) && (s.end_date || s.start_date) >= t);
+  if(!list.length) return `<p class="empty">Aucun show à venir avec vos chevaux. Les inscriptions se font dans <a class="link" href="${TRPH_URL}">TRPH</a>.</p>`;
+  return `<p class="muted" style="margin-top:18px">Shows à venir où vous avez un cheval inscrit ou un voyage prévu. Les données viennent de TRPH.</p>` +
+    list.map(s => {
+      const es = D.entries.filter(e => e.show_id === s.id);
+      const going = D.trips.some(x => (x.show_ids || []).includes(s.id));
+      const open = openShows.has(s.id);
+      const horses = es.map(e => D.horse[e.horse_id]?.barn_name).filter(Boolean);
+      return `<article class="show">
+        <button aria-expanded="${open}" data-show="${s.id}">
+          <h3>${esc(s.name)}</h3>
+          <div class="meta">${esc(fmtRange(s.start_date, s.end_date))}${s.location ? "<br>" + esc(s.location) : ""}</div>
+          <div class="shows" style="justify-content:flex-start">
+            ${horses.map(h => `<span class="chip">${esc(h)}</span>`).join("")}
+            ${going ? `<span class="chip on">J’y vais</span>` : ""}
+            ${s.entries_close && s.entries_close >= t ? `<span class="chip warn">Inscriptions avant le ${esc(fmt(s.entries_close,{day:"numeric",month:"short"}))}</span>` : ""}
+          </div>
+        </button>
+        ${open ? `<div class="body">${es.length ? es.map(e => horseBlock(e, D.meId)).join("") : `<p class="muted">Aucun de vos chevaux n’est inscrit à ce show.</p>`}
+          <a class="link" href="${TRPH_URL}">Ouvrir dans TRPH</a></div>` : ""}
+      </article>`;
+    }).join("");
+}
+
+// ---------- Rendu ----------
+function route(){ return (location.hash.slice(1) || "accueil") === "concours" ? "concours" : "accueil"; }
+function render(){
+  if(!D) return;
+  const v = route();
+  $("#title").textContent = v === "concours" ? "Concours" : "Accueil";
+  document.querySelectorAll("nav a").forEach(a => a.dataset.v === v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
+  $("#main").innerHTML = v === "concours" ? viewConcours() : viewAccueil();
+}
+$("#main").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-show]"); if(!b) return;
+  const id = b.dataset.show; openShows.has(id) ? openShows.delete(id) : openShows.add(id); render();
+});
+addEventListener("hashchange", () => { render(); scrollTo({top:0}); });
+
+async function start(){
+  $("#vLogin").hidden = true; $("#vApp").hidden = false;
+  $("#today").textContent = fmt(todayISO(), {weekday:"long", day:"numeric", month:"long"});
+  $("#main").innerHTML = `<p class="empty">Chargement…</p>`;
+  try { await load(); render(); }
+  catch(e){ $("#main").innerHTML = `<p class="empty">Les données ne se chargent pas (${esc(e.message)}). Vérifiez la connexion internet, puis rouvrez l’app.</p>`; }
+}
+document.addEventListener("visibilitychange", () => { if(!document.hidden && D) load().then(render).catch(()=>{}); });
+
+(async () => {
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) start(); else $("#vLogin").hidden = false;
+})();
+</script>
+</body>
+</html>
