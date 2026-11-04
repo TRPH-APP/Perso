@@ -384,7 +384,7 @@ function tripWindow(tripId){
   const ids = x.show_ids || [];
   const days = D.entries.filter(e => ids.includes(e.show_id) && e.shown_by === D.meId)
     .flatMap(e => (e.class_ids || []).map(c => D.cls[c]?.class_date)).filter(Boolean).sort();
-  if(days.length) return { from:days[0], to:days[days.length - 1], src:"classes" };
+  if(days.length) return { from:addDays(days[0], -3), first:days[0], to:days[days.length - 1], src:"classes" };
   const sh = ids.map(i => D.show[i]).filter(Boolean);
   if(sh.length) return { from: sh.map(s => s.start_date).sort()[0], to: sh.map(s => s.end_date || s.start_date).sort().pop(), src:"show" };
   return x.start_date ? { from:x.start_date, to:x.end_date || x.start_date, src:"voyage" } : null;
@@ -396,10 +396,13 @@ function bookWindow(b){
   const out = fl.filter(f => f.start_date <= w.from).map(f => f.end_date || f.start_date).sort().pop();
   const back = fl.filter(f => f.start_date >= w.to).map(f => f.start_date).sort()[0];
   if(!out && !back) return w;
-  return { from: out || w.from, to: back || w.to, src: out && back ? "vols" : "mixte" };
+  return { from: out || w.from, to: back || w.to, src: out && back ? "vols" : "mixte", first: out ? null : w.first };
 }
 const SRC = { classes:"d’après vos classes", show:"dates du show, programme pas encore importé", voyage:"dates du voyage", vols:"d’après vos vols", mixte:"d’après vos vols et vos classes" };
-const winText = w => w ? `du ${fmt(w.from,{weekday:"short",day:"numeric",month:"short"})} au ${fmt(w.to,{weekday:"short",day:"numeric",month:"short"})} (${SRC[w.src]})` : "";
+const fd = iso => fmt(iso,{weekday:"short",day:"numeric",month:"short"});
+const winText = w => !w ? "" : w.first
+  ? `arrivée entre le ${fd(w.from)} (3 jours max. avant) et le ${fd(w.first)} (1re classe), départ après le ${fd(w.to)} (dernière classe)`
+  : `du ${fd(w.from)} au ${fd(w.to)} (${SRC[w.src]})`;
 function bkCard(b){
   const todo = b.status === "afaire";
   return `<button class="bk${todo ? " todo" : ""}" data-edit-bk="${b.id}">
