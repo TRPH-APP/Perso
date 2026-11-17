@@ -133,6 +133,19 @@ nav a[aria-current=page]{color:var(--turq);background:color-mix(in srgb,var(--tu
 .ex .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .ex .s{color:var(--soft);font-size:.88rem}
 .pos{color:var(--turq)} .neg{color:var(--warn)}
+.ctile{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:18px;color:var(--ink);text-decoration:none}
+.ctile .top2{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ctile .v{font-family:"Young Serif",Georgia,serif;font-size:1.5rem;font-variant-numeric:tabular-nums}
+.meter{height:10px;border-radius:999px;background:color-mix(in srgb,var(--soft) 18%,transparent);overflow:hidden;margin:10px 0 6px}
+.meter > i{display:block;height:100%;border-radius:999px;background:var(--turq)}
+.meter.over > i{background:var(--warn)}
+.alert{border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:10px 14px;margin-top:14px;font-weight:600;display:block;text-decoration:none}
+.mnav{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px}
+.mnav button{all:unset;cursor:pointer;color:var(--turq);font-weight:700;padding:4px 8px;font-size:1.2rem}
+.mnav button[disabled]{opacity:.3;cursor:default}
+.catr{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:8px 0;border-top:1px solid var(--line)}
+.catr .meter{grid-column:1 / -1;height:6px;margin:2px 0 0}
+.catr .r{font-variant-numeric:tabular-nums;white-space:nowrap}
 details summary{cursor:pointer;color:var(--soft);font-weight:600;margin:14px 0 6px}
 dialog{border:0;border-radius:12px;padding:0;width:min(560px,94vw);max-height:90vh;background:var(--card);color:var(--ink)}
 dialog::backdrop{background:rgba(8,22,24,.55)}
@@ -241,6 +254,11 @@ async function load(){
     for(const r of [trips, bks, dls, exs]) if(r.error) throw new Error("perso: " + r.error.message);
   if(shows.error) throw new Error("shows: " + shows.error.message);
   const meId = me.data?.id;
+  const [ct, cs] = await Promise.all([
+    sb.from("perso_card_tx").select("*").order("tx_date", {ascending:false}),
+    sb.from("perso_settings").select("value").eq("key", "card").maybeSingle()
+  ]);
+  if(ct.error) throw new Error("carte: " + ct.error.message);
   let entries = [], horses = [], classes = [];
   if(meId){
     const e = await sb.from("entries").select("id,show_id,horse_id,owner_id,shown_by,classes,class_ids")
@@ -256,6 +274,7 @@ async function load(){
   }
   D = { meId, trips: trips.data, shows: shows.data, entries,
         bookings: bks.data, deadlines: dls.data, expenses: exs.data, packing: pk.data || [],
+        card: ct.data || [], cardCfg: Object.assign({ alert_threshold:5000, alert_currency:"USD", closing_day:null }, cs.data?.value || {}),
         trip: Object.fromEntries(trips.data.map(t => [t.id, t])),
         horse: Object.fromEntries(horses.map(h => [h.id, h])),
         cls: Object.fromEntries(classes.map(c => [c.id, c])),
@@ -285,7 +304,7 @@ function viewAccueil(){
   const t = todayISO();
   const upcoming = D.trips.filter(x => (x.end_date || x.start_date) >= t);
   const cur = upcoming[0];
-  if(!cur) return `<div class="bib"><p class="when">Aucun voyage prévu</p><h2>Ajoutez votre prochain show</h2></div>` + homeExtras(t);
+  if(!cur) return `<div class="bib"><p class="when">Aucun voyage prévu</p><h2>Ajoutez votre prochain show</h2></div>` + cardAlert() + homeExtras(t);
   const live = cur.start_date <= t;
   const n = live ? daysBetween(cur.start_date, t) + 1 : daysBetween(t, cur.start_date);
   const total = daysBetween(cur.start_date, cur.end_date) + 1;
@@ -305,6 +324,7 @@ function viewAccueil(){
     ${closing.length ? `<div class="shows">${closing.map(s => `<span class="chip warn">Inscriptions avant le ${esc(fmt(s.entries_close,{day:"numeric",month:"long"}))}</span>`).join("")}</div>` : ""}
   </div>`;
 
+  html += cardAlert();
   html += homeExtras(t);
   html += `<section><h3>Mes chevaux sur ce voyage</h3>`;
   html += showEntries.length
@@ -527,10 +547,74 @@ function viewFinances(){
       <button class="btn small line" data-settle="${c}">Marquer comme réglé</button></div>`).join("")
     : `<p class="muted">Vous êtes quittes</p><div class="amt">0,00 $</div>`;
   return `<div class="balance">${head}</div>
+    ${cardTile()}
     <div class="toolbar"><p class="muted" style="margin:0">Hôtels, voitures, courses : les vols restent en dehors.</p>
       <button class="btn small" data-new="ex">Ajouter une dépense</button></div>
     <section style="margin-top:14px">${open.map(exRow).join("") || `<p class="empty">Aucune dépense en cours.</p>`}</section>
     ${done.length ? `<details><summary>Déjà réglé (${done.length})</summary>${done.map(exRow).join("")}</details>` : ""}`;
+}
+
+// ---------- Carte Viseca ----------
+const CCATS = ["Logement","Voiture & essence","Camping-car","Vétérinaire","Concours","Courses & restos","Shopping","Photos","Autre"];
+let CMONTH = 0; // 0 = période en cours, -1 = précédente…
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+function cardPeriod(off = 0){
+  // Mois calendaire, ou du lendemain de la clôture au jour de clôture si closing_day est connu
+  const cd = Number(D.cardCfg.closing_day) || 0, t = toDate(todayISO());
+  let y = t.getFullYear(), m = t.getMonth();
+  if(cd && t.getDate() > cd) m += 1;
+  m += off;
+  const end = cd ? new Date(y, m, Math.min(cd, new Date(y, m+1, 0).getDate()), 12) : new Date(y, m+1, 0, 12);
+  const start = cd ? new Date(y, m-1, Math.min(cd, new Date(y, m, 0).getDate()) + 1, 12) : new Date(y, m, 1, 12);
+  const label = cd ? `${fmt(iso(start),{day:"numeric",month:"short"})} – ${fmt(iso(end),{day:"numeric",month:"short",year:"numeric"})}`
+                   : fmt(iso(start),{month:"long",year:"numeric"});
+  return { start: iso(start), end: iso(end), label };
+}
+function myPart(tx){ const e = tx.expense_id && D.expenses.find(x => x.id === tx.expense_id); return e ? Number(e.my_share) : 1; }
+function cardStats(off = 0){
+  const P = cardPeriod(off), c = D.cardCfg.alert_currency || "USD";
+  const list = D.card.filter(x => !x.planned && x.currency === c && x.tx_date >= P.start && x.tx_date <= P.end);
+  const total = list.reduce((a, x) => a + Number(x.amount), 0);
+  const mine = list.reduce((a, x) => a + Number(x.amount) * myPart(x), 0);
+  return { P, c, list, total, mine, back: total - mine, lim: Number(D.cardCfg.alert_threshold) || 0 };
+}
+function meter(v, lim){ const pct = lim ? Math.min(100, v / lim * 100) : 0; return `<div class="meter${lim && v > lim ? " over" : ""}"><i style="width:${pct.toFixed(1)}%"></i></div>`; }
+function cardTile(){
+  const S = cardStats(0);
+  return `<a class="ctile" href="#carte"><div class="top2"><h3>Carte · ${esc(S.P.label)}</h3><span class="v">${esc(money(S.total, S.c))}</span></div>
+    ${meter(S.total, S.lim)}<p class="muted" style="margin:0">${S.lim && S.total > S.lim ? `Au-dessus de l’alerte de ${esc(money(S.lim, S.c))}` : `Alerte à ${esc(money(S.lim, S.c))}`}${S.back > .005 ? ` · ${esc(money(S.back, S.c))} à récupérer` : ""}</p></a>`;
+}
+function cardAlert(){
+  if(!D.card.length) return "";
+  const S = cardStats(0);
+  return S.lim && S.total > S.lim ? `<a class="alert" href="#carte">Carte : ${esc(money(S.total, S.c))} en ${esc(S.P.label)}, au-dessus de votre alerte de ${esc(money(S.lim, S.c))}.</a>` : "";
+}
+function ctRow(x){
+  const p = myPart(x), tr = x.trip_id && tripOf(x.trip_id);
+  return `<div class="ex" data-edit-ct="${x.id}"><span>${esc(x.merchant)}<br><span class="s">${esc(fmtDay(x.tx_date))} · ${esc(x.category)}${tr ? " · " + esc(tr.title) : ""}${p < .999 ? ` · votre part ${Math.round(p*100)} %` : ""}${x.notes ? " · " + esc(x.notes) : ""}</span></span>
+    <span class="r">${esc(money(x.amount, x.currency))}</span></div>`;
+}
+function viewCarte(){
+  const S = cardStats(CMONTH), oldest = D.card.reduce((a, x) => x.tx_date < a ? x.tx_date : a, todayISO());
+  const canPrev = cardPeriod(CMONTH - 1).end >= oldest;
+  const cats = {}; S.list.forEach(x => cats[x.category] = (cats[x.category] || 0) + Number(x.amount));
+  const catHtml = Object.entries(cats).sort((a,b) => b[1]-a[1]).map(([k, v]) =>
+    `<div class="catr"><span>${esc(k)}</span><span class="r">${esc(money(v, S.c))}</span>${meter(v, S.total)}</div>`).join("");
+  const planned = D.card.filter(x => x.planned && x.tx_date >= todayISO()).sort((a,b) => a.tx_date.localeCompare(b.tx_date));
+  return `<div class="balance">
+      <div class="mnav"><button data-cmonth="-1" aria-label="Période précédente" ${canPrev ? "" : "disabled"}>‹</button>
+        <p class="muted" style="text-transform:capitalize">${esc(S.P.label)}</p>
+        <button data-cmonth="1" aria-label="Période suivante" ${CMONTH >= 0 ? "disabled" : ""}>›</button></div>
+      <div class="amt">${esc(money(S.total, S.c))}</div>
+      ${meter(S.total, S.lim)}
+      <p class="muted">${S.lim && S.total > S.lim ? `<span class="neg">Au-dessus de l’alerte de ${esc(money(S.lim, S.c))}</span>` : `Alerte à ${esc(money(S.lim, S.c))}`}</p>
+      ${S.back > .005 ? `<p class="muted" style="margin-top:6px">Votre part réelle : <b>${esc(money(S.mine, S.c))}</b> · ${esc(money(S.back, S.c))} à récupérer</p>` : ""}
+    </div>
+    ${D.cardCfg.closing_day ? "" : `<p class="muted" style="margin-top:12px">Périodes par mois calendaire, en attendant la date de clôture de la carte.</p>`}
+    <div class="toolbar"><a class="back" href="#finances" style="margin:0">‹ Finances</a><button class="btn small" data-new="ct">Ajouter</button></div>
+    ${catHtml ? `<section style="margin-top:18px"><h3>Par catégorie</h3>${catHtml}</section>` : ""}
+    ${planned.length ? `<section><h3>Paiements prévus</h3>${planned.map(ctRow).join("")}</section>` : ""}
+    <section><h3>Dépenses</h3>${S.list.map(ctRow).join("") || `<p class="empty">Aucune dépense sur cette période.</p>`}</section>`;
 }
 
 // ---------- Étape 3 : coffre-fort chiffré ----------
@@ -845,6 +929,16 @@ function openForm(kind, row, preset = {}){
       ${isNew ? "" : `<div class="f"><label style="font-weight:400;display:flex;gap:8px"><input type="checkbox" name="settled" style="width:auto" ${r.settled ? "checked" : ""}>Réglé</label></div>`}
       ${area("notes","Notes",r.notes)}`;
   }
+  if(kind === "ct"){
+    body = `<h2>${isNew ? "Dépense carte" : "Dépense carte"}</h2>
+      ${inp("merchant","Commerçant",r.merchant,"text","required")}
+      <div class="f2">${inp("tx_date","Date",r.tx_date || todayISO(),"date")}${inp("place","Lieu",r.place)}</div>
+      <div class="f2">${inp("amount","Montant",r.amount,"number",'step="0.01" inputmode="decimal" required')}${sel("currency","Devise",opt([["USD","$ US"],["EUR","€"]], r.currency || "USD"))}</div>
+      ${sel("category","Catégorie",opt(CCATS.map(c => [c, c]), r.category || "Autre"))}
+      ${sel("trip_id","Voyage",tripOpts(r.trip_id))}
+      <div class="f"><label style="font-weight:400;display:flex;gap:8px"><input type="checkbox" name="planned" style="width:auto" ${r.planned ? "checked" : ""}>Paiement prévu (pas encore passé)</label></div>
+      ${area("notes","Notes",r.notes)}`;
+  }
   FORM = { kind, id: row?.id };
   $("#frm").innerHTML = body + `<p class="msg" id="frmMsg" role="status"></p><div class="actions">
     ${isNew ? "" : `<button type="button" class="btn danger small" data-del>Supprimer</button>`}<span class="sp"></span>
@@ -853,12 +947,14 @@ function openForm(kind, row, preset = {}){
   const sp = $("#f_split"); if(sp) sp.onchange = () => $("#customBox").hidden = sp.value !== "custom";
   $("#dlg").showModal();
 }
-const TABLE = { trip:"perso_trips", bk:"perso_bookings", dl:"perso_deadlines", ex:"perso_expenses", pk:"perso_packing" };
+const TABLE = { trip:"perso_trips", bk:"perso_bookings", dl:"perso_deadlines", ex:"perso_expenses", pk:"perso_packing", ct:"perso_card_tx" };
 function collect(kind){
   const fd = new FormData($("#frm")), v = k => { const x = fd.get(k); return x === null || x === "" ? null : String(x).trim(); };
   if(kind === "trip") return { title:v("title"), location:v("location"), start_date:v("start_date"), end_date:v("end_date"), notes:v("notes"), show_ids: fd.getAll("show_ids"), weather_place:v("weather_place") };
   if(kind === "pk") return { category:v("category") || "Divers", label:v("label"), trip_id:v("trip_id") };
   if(kind === "bk") return Object.fromEntries(["kind","status","title","trip_id","start_date","start_time","end_date","end_time","origin","destination","flight_no","seat","provider","cabin","reference","ticket","currency","notes"].map(k => [k, v(k)]).concat([["cost", v("cost") === null ? null : Number(v("cost"))]]));
+  if(kind === "ct") return { merchant:v("merchant"), tx_date:v("tx_date") || todayISO(), place:v("place"), amount:Number(v("amount")), currency:v("currency"),
+    category:v("category"), trip_id:v("trip_id"), planned: fd.get("planned") === "on", notes:v("notes") };
   if(kind === "dl") return { title:v("title"), due_date:v("due_date"), status:v("status"), trip_id:v("trip_id"), notes:v("notes") };
   if(kind === "ex"){
     const sp = v("split"); let my = .5, ma = .5;
@@ -913,15 +1009,16 @@ $("#frm").addEventListener("click", async ev => {
 function route(){
   const h = location.hash.slice(1) || "accueil";
   if(h.startsWith("voyage-")) return { v:"voyages", id:h.slice(7) };
+  if(h === "carte") return { v:"finances", sub:"carte" };
   return { v: ["accueil","concours","voyages","finances","coffre"].includes(h) ? h : "accueil" };
 }
 const TITLES = { accueil:"Accueil", concours:"Concours", voyages:"Voyages", finances:"Finances", coffre:"Coffre-fort" };
 function render(){
   if(!D) return;
-  const { v, id } = route();
-  $("#title").textContent = TITLES[v];
+  const { v, id, sub } = route();
+  $("#title").textContent = sub === "carte" ? "Carte" : TITLES[v];
   document.querySelectorAll("nav a").forEach(a => a.dataset.v === v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
-  $("#main").innerHTML = v === "concours" ? viewConcours() : v === "voyages" ? (id ? viewVoyage(id) : viewVoyages()) : v === "finances" ? viewFinances() : v === "coffre" ? viewCoffre() : viewAccueil();
+  $("#main").innerHTML = v === "concours" ? viewConcours() : v === "voyages" ? (id ? viewVoyage(id) : viewVoyages()) : v === "finances" ? (sub === "carte" ? viewCarte() : viewFinances()) : v === "coffre" ? viewCoffre() : viewAccueil();
   if(v === "voyages" && id && tripOf(id)) fillWeather(tripOf(id));
 }
 $("#main").addEventListener("click", async ev => {
@@ -930,6 +1027,8 @@ $("#main").addEventListener("click", async ev => {
   if(b = g("button[data-show]")){ const id = b.dataset.show; openShows.has(id) ? openShows.delete(id) : openShows.add(id); render(); return; }
   if(b = g("[data-edit-bk]")) return openForm("bk", D.bookings.find(x => x.id === b.dataset.editBk));
   if(b = g("[data-edit-dl]")) return openForm("dl", D.deadlines.find(x => x.id === b.dataset.editDl));
+  if(b = g("[data-edit-ct]")) return openForm("ct", D.card.find(x => x.id === b.dataset.editCt));
+  if(b = g("[data-cmonth]")){ CMONTH = Math.min(0, CMONTH + Number(b.dataset.cmonth)); return render(); }
   if(b = g("[data-edit-ex]")) return openForm("ex", D.expenses.find(x => x.id === b.dataset.editEx));
   if(b = g("[data-edit-trip]")) return openForm("trip", tripOf(b.dataset.editTrip));
   if(b = g("[data-edit-pk]")) return openForm("pk", D.packing.find(x => x.id === b.dataset.editPk));
@@ -946,6 +1045,7 @@ $("#main").addEventListener("click", async ev => {
   if(b = g("[data-vdoc]")) return openVaultDoc(VAULT.docs.find(d => d.id === b.dataset.vdoc));
   if(b = g("[data-new]")){
     const tr = b.dataset.trip || (route().id ?? null);
+    if(b.dataset.new === "ct") return openForm("ct", null, {});
     return openForm(b.dataset.new, null, b.dataset.new === "trip" ? {} : { trip_id: tr });
   }
   if(b = g("[data-settle]")){
@@ -971,7 +1071,7 @@ $("#main").addEventListener("change", async ev => {
   if(error){ c.checked = !c.checked; return toast("Pas enregistré : " + error.message); }
   refresh(c.checked ? "Fait" : "Remis à faire");
 });
-addEventListener("hashchange", () => { render(); scrollTo({top:0}); });
+addEventListener("hashchange", () => { if(location.hash !== "#carte") CMONTH = 0; render(); scrollTo({top:0}); });
 
 async function start(){
   $("#vLogin").hidden = true; $("#vApp").hidden = false;
